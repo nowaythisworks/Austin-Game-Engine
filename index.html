@@ -1,0 +1,832 @@
+<!-- HTML layout with a left side panel, top navigation bar, right side panel, and bottom panel -->
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Austin's Game Engine 0.1.0</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat&display=swap" rel="stylesheet">
+
+    <script async src="https://unpkg.com/es-module-shims@1.6.3/dist/es-module-shims.js"></script>
+
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://unpkg.com/three@0.150.1/build/three.module.js",
+          "three/addons/": "https://unpkg.com/three@0.150.1/examples/jsm/"
+        }
+      }
+    </script>
+</head>
+
+<body>
+    <!-- <div id="target" style="position: absolute; top:0; left:0; z-index: 2000; background: red;">a</div> -->
+    <!-- Right Click Context Menu -->
+    <div id="right-click-menu">
+        <li>Option 1</li>
+        <li>Option 2</li>
+        <li>Option 3</li>
+        <li>Option 4</li>
+        <li>Option 5</li>
+    </div>
+
+    <div class="container">
+        <div id="top-panel" class="panel">
+            <div id="top-panel-bar">
+                <span class="top-panel-option">
+                    File
+                </span>
+                <span class="top-panel-option">
+                    Edit
+                </span>
+                <span class="top-panel-option">
+                    View
+                </span>
+                <span class="top-panel-option">
+                    Help
+                </span>
+                <span class="top-panel-option" style="color:#494949">
+                    |
+                </span>
+                <span class="top-panel-option">
+                    Snap
+                </span>
+                <span class="top-panel-option">
+                    Object
+                </span>
+                <span class="top-panel-option">
+                    View
+                </span>
+                <span class="top-panel-option">
+                    Help
+                </span>
+                <div  class="top-panel-option" style="width: 58%; opacity: 0">a</div>
+            </div>
+        </div>
+        <div id="left-panel" class="panel">
+            <h1>Hierarchy</h1>
+            <p>0 total objects</p>
+            <ul id="scene-objects-list"></ul>
+        </div>
+        <div id="right-panel" class="panel">
+            <h1>Inspector</h1>
+            <p>nothing selected</p>
+            <div id="object-inspector-elements"></div>
+        </div>
+        <div id="bottom-panel" class="panel">
+            <div class="resize-unflip">
+                <h1>Resources</h1>
+                <p>0 Available Objects</p>
+            </div>
+        </div>
+
+        <!-- Editor Window -->
+        <div id="center-panel" class="panel">
+            <h1>Loading . . .</h1>
+        </div>
+    </div>
+
+    <script type="module">
+        //  ### IMPORTS
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { TransformControls } from 'three/addons/controls/TransformControls.js';
+        
+        // ### CANVAS INITIALIZATION
+        const editorWindow = document.querySelector("#center-panel");
+        editorWindow.innerHTML = "";
+        const canvas = document.createElement("canvas");
+        canvas.id = "editor-canvas";
+        canvas.width = editorWindow.clientWidth;
+        canvas.height = editorWindow.clientHeight;
+        editorWindow.appendChild(canvas);
+
+
+        // ### THREE.JS RENDERER INITIALIZATION
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(40, canvas.width / canvas.height, 0.1, 1000);
+        camera.position.z = 5;
+        const renderer = new THREE.WebGLRenderer({ canvas: canvas });
+        renderer.setPixelRatio(window.devicePixelRatio);
+        const gridHelper = new THREE.GridHelper(25, 12);
+        scene.add(gridHelper);
+        const controls = new OrbitControls(camera, canvas);
+        window.addEventListener("resize", function() {
+            canvas.width = editorWindow.clientWidth;
+            canvas.height = editorWindow.clientHeight;
+            camera.aspect = canvas.width / canvas.height;
+            camera.updateProjectionMatrix();
+            renderer.setSize(canvas.width, canvas.height);
+            renderer.setPixelRatio(window.devicePixelRatio);
+        });
+
+
+        // ### ANIMATION LOOP
+        const animate = function() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        };
+        animate();
+
+
+        //  ### SIMPLE FUNCTIONS
+        const randomColor = function() { return new THREE.Color(0xffffff * Math.random()); }
+        const transformControls = new TransformControls(camera, canvas);
+        var retachAvailable = true;
+        transformControls.size = 2;
+        scene.add(transformControls);
+        transformControls.addEventListener('dragging-changed', function (event) {
+            controls.enabled = !event.value;
+            retachAvailable = !event.value;
+        });
+        var selectedObject;
+        const attachHandles = function(item) {
+            if (!retachAvailable) return;
+            transformControls.attach(item);
+            selectedObject = item;
+
+            // for each property in the object, create an input field in #object-inspector-elements
+            const inspector = document.querySelector("#object-inspector-elements");
+            inspector.innerHTML = "";
+
+            if (selectedObject.isObject3D == true)
+            {
+                console.log(selectedObject);
+                // Position (X, Y, Z) in a row
+                const position = document.createElement("div");
+                position.classList.add("inspector-element");
+                position.innerHTML = "<h3>Position</h3>";
+                const positionX = document.createElement("input");
+                positionX.type = "number";
+                positionX.value = selectedObject.position.x;
+                positionX.style.width = "75px";
+                positionX.addEventListener("input", function() {
+                    selectedObject.position.x = positionX.value;
+                });
+                const positionY = document.createElement("input");
+                positionY.type = "number";
+                positionY.value = selectedObject.position.y;
+                positionY.style.width = "75px";
+                positionY.addEventListener("input", function() {
+                    selectedObject.position.y = positionY.value;
+                });
+                const positionZ = document.createElement("input");
+                positionZ.type = "number";
+                positionZ.value = selectedObject.position.z;
+                positionZ.style.width = "75px";
+                positionZ.addEventListener("input", function() {
+                    selectedObject.position.z = positionZ.value;
+                });
+                position.appendChild(positionX);
+                position.appendChild(positionY);
+                position.appendChild(positionZ);
+                inspector.appendChild(position);
+
+                // Rotation (X, Y, Z) in a row
+                const rotation = document.createElement("div");
+                rotation.classList.add("inspector-element");
+                rotation.innerHTML = "<h3>Rotation (Deg)</h3>";
+                const rotationX = document.createElement("input");
+                rotationX.type = "number";
+                rotationX.value = selectedObject.rotation.x;
+                rotationX.style.width = "75px";
+                rotationX.addEventListener("input", function() {
+                    selectedObject.rotation.x = rotationX.value * Math.PI / 180;
+                });
+                const rotationY = document.createElement("input");
+                rotationY.type = "number";
+                rotationY.value = selectedObject.rotation.y;
+                rotationY.style.width = "75px";
+                rotationY.addEventListener("input", function() {
+                    selectedObject.rotation.y = rotationY.value * Math.PI / 180;
+                });
+                const rotationZ = document.createElement("input");
+                rotationZ.type = "number";
+                rotationZ.value = selectedObject.rotation.z;
+                rotationZ.style.width = "75px";
+                rotationZ.addEventListener("input", function() {
+                    selectedObject.rotation.z = rotationZ.value * Math.PI / 180;
+                });
+                rotation.appendChild(rotationX);
+                rotation.appendChild(rotationY);
+                rotation.appendChild(rotationZ);
+                inspector.appendChild(rotation);
+
+                // Scale (X, Y, Z) in a row
+                const scale = document.createElement("div");
+                scale.classList.add("inspector-element");
+                scale.innerHTML = "<h3>Scale</h3>";
+                const scaleX = document.createElement("input");
+                scaleX.type = "number";
+                scaleX.value = selectedObject.scale.x;
+                scaleX.style.width = "75px";
+                scaleX.addEventListener("input", function() {
+                    selectedObject.scale.x = scaleX.value;
+                });
+                const scaleY = document.createElement("input");
+                scaleY.type = "number";
+                scaleY.value = selectedObject.scale.y;
+                scaleY.style.width = "75px";
+                scaleY.addEventListener("input", function() {
+                    selectedObject.scale.y = scaleY.value;
+                });
+                const scaleZ = document.createElement("input");
+                scaleZ.type = "number";
+                scaleZ.value = selectedObject.scale.z;
+                scaleZ.style.width = "75px";
+                scaleZ.addEventListener("input", function() {
+                    selectedObject.scale.z = scaleZ.value;
+                });
+                scale.appendChild(scaleX);
+                scale.appendChild(scaleY);
+                scale.appendChild(scaleZ);
+                inspector.appendChild(scale);
+            }
+            // if it's a light
+            if (selectedObject.isLight == true)
+            {
+                // Type of Light
+                const type = document.createElement("div");
+                type.classList.add("inspector-element");
+                type.innerHTML = "<h3>Type</h3>";
+                const typeInput = document.createElement("select");
+                typeInput.innerHTML = "<option value='AmbientLight'>Ambient Light</option><option value='DirectionalLight'>Directional Light</option><option value='PointLight'>Point Light</option><option value='SpotLight'>Spot Light</option>";
+                typeInput.value = selectedObject.type;
+                typeInput.addEventListener("input", function() {
+                    selectedObject.type = typeInput.value;
+                });
+                type.appendChild(typeInput);
+                inspector.appendChild(type);
+
+                // Color
+                const color = document.createElement("div");
+                color.classList.add("inspector-element");
+                color.innerHTML = "<h3>Color</h3>";
+                const colorInput = document.createElement("input");
+                colorInput.type = "color";
+                colorInput.value = "#" + selectedObject.color.getHexString();
+                colorInput.addEventListener("input", function() {
+                    selectedObject.color.set(colorInput.value);
+                });
+                color.appendChild(colorInput);
+                inspector.appendChild(color);
+
+                // Intensity
+                const intensity = document.createElement("div");
+                intensity.classList.add("inspector-element");
+                intensity.innerHTML = "<h3>Intensity</h3>";
+                const intensityInput = document.createElement("input");
+                intensityInput.type = "number";
+                intensityInput.value = selectedObject.intensity;
+                intensityInput.addEventListener("input", function() {
+                    selectedObject.intensity = intensityInput.value;
+                });
+                intensity.appendChild(intensityInput);
+                inspector.appendChild(intensity);
+
+                // Range
+                const range = document.createElement("div");
+                range.classList.add("inspector-element");
+                range.innerHTML = "<h3>Range</h3>";
+                const rangeInput = document.createElement("input");
+                rangeInput.type = "number";
+                rangeInput.value = selectedObject.distance;
+                rangeInput.addEventListener("input", function() {
+                    selectedObject.distance = rangeInput.value;
+                });
+                range.appendChild(rangeInput);
+                inspector.appendChild(range);
+            }
+            // For each material (if any)
+            if (selectedObject.material != undefined)
+            {
+                // if it's an array
+                if (Array.isArray(selectedObject.material))
+                {
+                    for (let i = 0; i < selectedObject.material.length; i++)
+                    {
+                        const material = selectedObject.material[i];
+                        const materialInspector = document.createElement("div");
+                        materialInspector.classList.add("inspector-element");
+                        materialInspector.innerHTML = "<h3>Material " + i + "</h3>";
+                        // Color
+                        const color = document.createElement("div");
+                        color.classList.add("inspector-element");
+                        color.innerHTML = "<h3>Color</h3>";
+                        const colorInput = document.createElement("input");
+                        colorInput.type = "color";
+                        colorInput.value = "#" + material.color.getHexString();
+                        colorInput.addEventListener("input", function() {
+                            material.color.set(colorInput.value);
+                        });
+                        color.appendChild(colorInput);
+                        materialInspector.appendChild(color);
+                        inspector.appendChild(materialInspector);
+                    }
+                }
+                // if it's a single material
+                else
+                {
+                    const material = selectedObject.material;
+                    const materialInspector = document.createElement("div");
+                    materialInspector.classList.add("inspector-element");
+                    materialInspector.innerHTML = "<h3>Material</h3>";
+                    // Color
+                    const color = document.createElement("div");
+                    color.classList.add("inspector-element");
+                    color.innerHTML = "<h3>Color</h3>";
+                    const colorInput = document.createElement("input");
+                    colorInput.type = "color";
+                    colorInput.value = "#" + material.color.getHexString();
+                    colorInput.addEventListener("input", function() {
+                        material.color.set(colorInput.value);
+                    });
+                    color.appendChild(colorInput);
+                    materialInspector.appendChild(color);
+                    inspector.appendChild(materialInspector);
+                }
+            }
+        }
+        const addToScene = function(item)
+        {
+            scene.add(item);
+            const list = document.querySelector("#scene-objects-list");
+
+            const li = document.createElement("li");
+            li.innerHTML = item.name;
+            li.addEventListener("click", function() {
+                // add transform controls to the item
+                attachHandles(item);
+                // add the "active" class to the <li>
+                li.classList.add("active");
+                // remove the "active" class from all other LIs
+                for (let i = 0; i < list.children.length; i++)
+                {
+                    if (list.children[i] !== li)
+                    {
+                        list.children[i].classList.remove("active");
+                    }
+                }
+            });
+            // doube click
+            li.addEventListener("dblclick", function() {
+                // replace the innerHTML with an <input> element
+                const input = document.createElement("input");
+                input.value = item.name;
+                li.innerHTML = "";
+                li.appendChild(input);
+                input.focus();
+                input.id = "text-input"
+                const cleanup = function() {
+                    item.name = input.value;
+                    li.innerHTML = item.name;
+                    input.remove();
+                }
+                input.addEventListener("blur", cleanup);
+                input.addEventListener("keydown", function(event) {
+                    if (event.key === "Enter") cleanup();
+                });
+                input.addEventListener("click", function(event) {
+                    event.stopPropagation();
+                });
+            });
+            list.appendChild(li);
+        }
+        const removeFromScene = function(item)
+        {
+            // if the item is of type light, scan the scene for any helpers for it
+            if (item.isLight == true)
+            {
+                for (let i = 0; i < scene.children.length; i++)
+                {
+                    if (scene.children[i].light != undefined && scene.children[i].light == item)
+                    {
+                        scene.remove(scene.children[i]);
+                    }
+                }
+            }
+            // remove the item
+            scene.remove(item);
+            // remove the <li> from left-panel with the item's name
+            const list = document.querySelector("#scene-objects-list");
+            for (let i = 0; i < list.children.length; i++)
+            {
+                if (list.children[i].innerHTML === item.name)
+                {
+                    list.children[i].remove();
+                }
+            }
+            // detach handles
+            transformControls.detach();
+        }
+        document.body.addEventListener('keydown', function(event) {
+            // if press 'del' and there is an object selected, remove it
+            if (event.key == "Delete" && transformControls.object != undefined)
+            {
+                removeFromScene(transformControls.object);
+            }
+            if (transformControls.object != undefined)
+            {
+                switch (event.key) {
+                    case 'w':
+                        transformControls.setMode("translate");
+                        break;
+                    case 'e':
+                        transformControls.setMode("rotate");
+                        break;
+                    case 'r':
+                        transformControls.setMode("rotate");
+                        break;
+                    case 't':
+                        transformControls.setMode("scale");
+                        break;
+                }
+            }
+            // if holding down control
+            if (event.ctrlKey)
+            {
+                switch (event.key) {
+                    case 'z':
+                        undo();
+                        break;
+                    case 'y':
+                        redo();
+                        break;
+                    case 'd':
+                        // prevent browser bookmark
+                        event.preventDefault();
+                        // if there is a selected object, duplicate it
+                        if (transformControls.object != undefined)
+                        {
+                            const clone = transformControls.object.clone();
+                            clone.name = transformControls.object.name + " (clone " + Math.floor(Math.random() * 1000) + ")";
+                            addToScene(clone);
+                            attachHandles(clone);
+                        }
+                        break;
+                }
+            }
+        });
+
+
+        // ### CONTEXT MENU
+        const rightClickMenu = document.querySelector("#right-click-menu");
+        const contextMenuClick = function(action)
+        {
+            switch (action)
+            {
+                //  ### Object Creation
+                case "Create Mesh":
+                    const mesh = new THREE.Mesh(
+                        new THREE.BoxGeometry(1, 1, 1),
+                        new THREE.MeshStandardMaterial({ color: randomColor() })
+                    );
+                    mesh.name = "New Mesh - " + Math.floor(Math.random() * 1000);
+                    addToScene(mesh);
+                    break;
+                case "Create Point Light":
+                    const light = new THREE.PointLight(new THREE.Color(0xffffff), 1, 100);
+                    light.name = "Point Light - " + Math.floor(Math.random() * 1000);
+                    light.position.y = 1.5;
+                    addToScene(light);
+                    const helper = new THREE.PointLightHelper(light, 0.2);
+                    scene.add(helper);
+                    break;
+                case "Create Directional Light":
+                    const directionalLight = new THREE.DirectionalLight(randomColor(), 1);
+                    directionalLight.name = "Directional Light - " + Math.floor(Math.random() * 1000);
+                    directionalLight.position.set(0, 1, 0);
+                    directionalLight.castShadow = true;
+                    directionalLight.shadow.mapSize.width = 1024;
+                    directionalLight.shadow.mapSize.height = 1024;
+                    directionalLight.shadow.camera.near = 0.5;
+                    directionalLight.shadow.camera.far = 500;
+                    addToScene(directionalLight);
+                    const directionalLightHelper = new THREE.DirectionalLightHelper(directionalLight, 0.2);
+                    scene.add(directionalLightHelper);
+                    break;
+                case "Create Spot Light":
+                    const spotLight = new THREE.SpotLight(randomColor(), 1, 100, Math.PI * 0.1, 0.25, 1);
+                    spotLight.name = "Spot Light - " + Math.floor(Math.random() * 1000);
+                    spotLight.position.set(0, 2, 0);
+                    spotLight.castShadow = true;
+                    spotLight.shadow.mapSize.width = 1024;
+                    spotLight.shadow.mapSize.height = 1024;
+                    spotLight.shadow.camera.near = 0.5;
+                    spotLight.shadow.camera.far = 500;
+                    spotLight.shadow.camera.fov = 30;
+                    addToScene(spotLight);
+                    const spotLightHelper = new THREE.SpotLightHelper(spotLight);
+                    scene.add(spotLightHelper);
+                    break;
+                case "Delete Object":
+                    removeFromScene(selectedObject);
+                    break;
+                case "Clone Object":
+                    const clone = selectedObject.clone();
+                    clone.name = selectedObject.name + " (Clone " + Math.floor(Math.random() * 1000) + ")";
+                    addToScene(clone);
+                    break;
+                default:
+                    console.log("Unassigned Action! [" + action + "]");
+                    break;
+            }
+        }
+        document.body.addEventListener("contextmenu", function(e) {
+            e.preventDefault();
+            const clickedElement = document.elementFromPoint(e.clientX, e.clientY);
+            if (clickedElement.id == "editor-canvas") return;
+            const options = [];
+            if (clickedElement.id == "left-panel") {
+                options.push("[] Add Geometry");
+                options.push("Create Mesh");
+                options.push("[] Add Lighting");
+                options.push("Create Point Light");
+                options.push("Create Spot Light");
+            }
+            if (clickedElement.parentElement.id == "scene-objects-list") {
+                options.push("Delete Object");
+                options.push("Clone Object");
+            }
+            // if options is empty, return;
+            if (options.length == 0) {
+                rightClickMenu.style.display = "none";
+                return;
+            }
+            // empty the menu
+            rightClickMenu.innerHTML = "";
+            for (let i = 0; i < options.length; i++) {
+                // if it starts with [], create a <hr> with legend
+                if (options[i].startsWith("[]")) {
+                    const divider = document.createElement("div");
+                    divider.classList.add("context-menu-divider");
+                    divider.innerHTML = options[i].replace("[]", "");
+                    rightClickMenu.appendChild(divider);
+                    continue;
+                }
+                const option = document.createElement("li");
+                option.innerHTML = options[i];
+                rightClickMenu.appendChild(option);
+                // add a click event listener
+                option.addEventListener("click", function() {
+                    // handle contextMenuClick with the innerhtml
+                    contextMenuClick(option.innerHTML);
+                });
+            }
+            rightClickMenu.style.display = "block";
+            rightClickMenu.style.animation = "fade-in 0.1s ease-in-out";
+            rightClickMenu.style.left = e.clientX + "px";
+            rightClickMenu.style.top = e.clientY + "px";
+        });
+        // on click out
+        document.body.addEventListener("click", function(e) {
+            rightClickMenu.style.display = "none";
+        });
+
+        // Editor Click Events
+        canvas.addEventListener("click", function(e) {
+
+            // shoot ray until first target is hit, attach transformControls to it
+            const raycaster = new THREE.Raycaster();
+
+            var mouse = new THREE.Vector2();
+
+            const rect = renderer.domElement.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const y = event.clientY - rect.top;
+
+            mouse.x = ( x / canvas.clientWidth ) *  2 - 1;
+            mouse.y = ( y / canvas.clientHeight) * - 2 + 1
+
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(scene.children, true);
+
+            let index = 0;
+            if (intersects.length > 0) {
+                // organize the interects by distance
+                intersects.sort(function(a, b) {
+                    return a.distance - b.distance;
+                });
+                const disallowedObjects = [
+                    "TransformControlsGizmo",
+                    "TransformControlsPlane",
+                    "GridHelper",
+                    "Line"
+                ]
+                // remove any intersects that are, have a parent that is, or have a parent whose parent is, any disallowedObjects type
+                for (let i = 0; i < intersects.length; i++) {
+                    if (disallowedObjects.includes(intersects[i].object.type)) {
+                        intersects.splice(i, 1);
+                        i--;
+                    }
+                    else if (intersects[i].object.parent != null && disallowedObjects.includes(intersects[i].object.parent.type)) {
+                        intersects.splice(i, 1);
+                        i--;
+                    }
+                    else if (intersects[i].object.parent != null && intersects[i].object.parent.parent != null && disallowedObjects.includes(intersects[i].object.parent.parent.type)) {
+                        intersects.splice(i, 1);
+                        i--;
+                    }
+                }
+                if (!intersects[index]) return;
+                if (intersects[index].object.type.includes('PointLightHelper')) {
+                    console.log(intersects[index].object);
+                    intersects[index].object = intersects[index].object.light;
+                }
+                attachHandles(intersects[index].object);
+                // add "active" to the <li> in left-panel with the object's name, and remove it from all other objects
+                const list = document.querySelector("#scene-objects-list");
+                for (let i = 0; i < list.children.length; i++) {
+                    if (list.children[i].innerHTML == intersects[index].object.name) {
+                        list.children[i].classList.add("active");
+                    }
+                    else {
+                        list.children[i].classList.remove("active");
+                    }
+                }
+                console.log(intersects[index]);
+            }
+        });
+
+    </script>
+
+    <style>
+        :root {
+            --editor-bg-color: #202020;
+            --side-panel-bg-color: #1B1B1B;
+            --bottom-panel-bg-color: #171717;
+            --font-color: #FFFFFF;
+        }
+
+        * {
+            margin: 0;
+            overflow: hidden;
+            color: white;
+            font-family: 'Montserrat', sans-serif;
+        }
+
+        #right-click-menu {
+            position: absolute;
+            margin: 0;
+
+            background: rgb(40, 39, 42);
+            display: none;
+
+            z-index: 2000;
+        }
+
+        .context-menu-divider {
+            border-top: 1px solid rgb(64, 64, 64);
+            color: rgb(106, 106, 106);
+            font-weight: bold;
+            padding: 5px 10px;
+            list-style: none;
+        }
+
+        #right-click-menu li {
+            color: rgb(137, 135, 135);
+            font-weight: bold;
+            padding: 5px 15px;
+            list-style: none;
+        }
+
+        #right-click-menu li:hover {
+            background:rgb(64, 64, 64);
+            cursor: pointer;
+        }
+
+        @keyframes fade-in {
+            0% {
+                opacity: 0;
+            }
+            100% {
+                opacity: 1;
+            }
+        }
+
+        /* Style the container */
+        .container {
+            height: 100%;
+            display: grid;
+            grid-template-columns: 1fr 3fr 1fr;
+            grid-template-rows: 0.4fr 4fr 1.75fr;
+            grid-gap: 0px;
+            background-color: var(--editor-bg-color);
+            padding: 0px;
+            
+        }
+
+        /* Universal for all panels */
+        .panel {
+            padding: 10px;
+        }
+
+        /* Style the left panel */
+        #left-panel {
+            grid-column: 1 / 2;
+            grid-row: 2 / 4;
+            background-color: var(--side-panel-bg-color);
+            border-radius: 0px 50px 0px 0px;
+        }
+
+        #left-panel ul {
+            margin: 10px 0px;
+            padding: 0;
+        }
+
+        #left-panel li {
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 80%;
+        }
+
+        #left-panel li:hover {
+            background:rgb(64, 64, 64);
+            cursor: pointer;
+        }
+
+        .active {
+            background:rgb(40, 40, 40);
+        }
+
+        /* Style the top panel */
+        #top-panel {
+            padding: 0px;
+            grid-column: 1 / 4;
+            grid-row: 1 / 2;
+            background-color: var(--editor-bg-color);
+        }
+
+        /* Style the right panel */
+        #right-panel {
+            grid-column: 3 / 4;
+            grid-row: 4 / 2;
+            background-color: var(--side-panel-bg-color);
+            border-radius: 15px 0px 0px 0px;
+        }
+
+        /* Style the bottom panel */
+        #bottom-panel {
+            grid-column: 2 / 3;
+            grid-row: 3 / 5;
+            background-color: var(--bottom-panel-bg-color);
+            resize: vertical;
+            transform: rotate(180deg);
+            max-height: 500px;
+            min-height: 100px;
+        }
+
+        /* Style the center panel  */
+        #center-panel {
+            grid-column: 2 / 3;
+            grid-row: 2 / 3;
+            background-color: var(--editor-bg-color);
+
+            margin: 0;
+            padding: 0;
+            border-radius: 25px 25px 0px 0px;
+
+            /* absolute center all elements inside this */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #top-panel-bar {
+            display: table;
+            width: 100%;
+            height: 100%;
+            text-align: center;
+        }
+
+        .top-panel-option {
+            /* vertical align spans in a div with 100% height */
+            display: table-cell;
+            vertical-align: middle;
+        }
+
+        .top-panel-option:hover {
+            background-color: #2B2B2B;
+            cursor: pointer;
+        }
+
+        .resize-unflip {
+            transform: rotate(180deg);
+            height: 100%;
+        }
+
+        input, select {
+            border-radius: 2px;
+            border: none;
+            background: #242424;
+            border-radius: 2px;
+            outline: 2px solid #2e2e2e;
+            color: var(--font-color);
+            padding-top: 5px;
+        }
+    </style>
+</body>
+</html>
