@@ -67,12 +67,12 @@
         </div>
         <div id="left-panel" class="panel">
             <h1>Hierarchy</h1>
-            <p>0 total objects</p>
+            <span id="object-counter">0</span><span id="object-counter-label"> total objects</span>
             <ul id="scene-objects-list"></ul>
         </div>
         <div id="right-panel" class="panel">
             <h1>Inspector</h1>
-            <p>nothing selected</p>
+            <p id="selection-name">nothing selected</p>
             <div id="object-inspector-elements"></div>
         </div>
         <div id="bottom-panel" class="panel">
@@ -107,7 +107,12 @@
         // ### THREE.JS RENDERER INITIALIZATION
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(40, canvas.width / canvas.height, 0.1, 1000);
-        camera.position.z = 5;
+        camera.position.x = -27.65656251980899;
+        camera.position.y = 22.536512419213917;
+        camera.position.z = 27.428691501840778;
+        camera.rotation.x = -0.7733129332359928;
+        camera.rotation.y = -0.6160013614421702;
+        camera.rotation.z = -0.5135108191734854;
         const renderer = new THREE.WebGLRenderer({ canvas: canvas });
         renderer.setPixelRatio(window.devicePixelRatio);
         const gridHelper = new THREE.GridHelper(25, 12);
@@ -127,6 +132,7 @@
         const animate = function() {
             requestAnimationFrame(animate);
             controls.update();
+            console.log(camera);
             renderer.render(scene, camera);
         };
         animate();
@@ -136,7 +142,7 @@
         const randomColor = function() { return new THREE.Color(0xffffff * Math.random()); }
         const transformControls = new TransformControls(camera, canvas);
         var retachAvailable = true;
-        transformControls.size = 2;
+        transformControls.size = 1.25;
         scene.add(transformControls);
         transformControls.addEventListener('dragging-changed', function (event) {
             controls.enabled = !event.value;
@@ -147,6 +153,8 @@
             if (!retachAvailable) return;
             transformControls.attach(item);
             selectedObject = item;
+
+            document.querySelector("#selection-name").innerHTML = item.name;
 
             // for each property in the object, create an input field in #object-inspector-elements
             const inspector = document.querySelector("#object-inspector-elements");
@@ -299,6 +307,19 @@
                 });
                 range.appendChild(rangeInput);
                 inspector.appendChild(range);
+
+                // Shadows
+                const shadows = document.createElement("div");
+                shadows.classList.add("inspector-element");
+                shadows.innerHTML = "<h3>Shadows</h3>";
+                const shadowsInput = document.createElement("input");
+                shadowsInput.type = "checkbox";
+                shadowsInput.checked = selectedObject.castShadow;
+                shadowsInput.addEventListener("input", function() {
+                    selectedObject.castShadow = shadowsInput.checked;
+                });
+                shadows.appendChild(shadowsInput);
+                inspector.appendChild(shadows);
             }
             // For each material (if any)
             if (selectedObject.material != undefined)
@@ -353,6 +374,10 @@
         const addToScene = function(item)
         {
             scene.add(item);
+            document.querySelector("#object-counter").innerHTML = parseInt(document.querySelector("#object-counter").innerHTML) + 1;
+            if (document.querySelector("#object-counter").innerHTML == 1) document.querySelector("#object-counter-label").innerHTML = " total object";
+            else document.querySelector("#object-counter-label").innerHTML = " total objects";
+
             const list = document.querySelector("#scene-objects-list");
 
             const li = document.createElement("li");
@@ -410,6 +435,10 @@
             }
             // remove the item
             scene.remove(item);
+            document.querySelector("#object-counter").innerHTML = parseInt(document.querySelector("#object-counter").innerHTML) - 1;
+            if (document.querySelector("#object-counter").innerHTML == 1) document.querySelector("#object-counter-label").innerHTML = "object";
+            else document.querySelector("#object-counter-label").innerHTML = "total objects";
+
             // remove the <li> from left-panel with the item's name
             const list = document.querySelector("#scene-objects-list");
             for (let i = 0; i < list.children.length; i++)
@@ -463,9 +492,36 @@
                         {
                             const clone = transformControls.object.clone();
                             clone.name = transformControls.object.name + " (clone " + Math.floor(Math.random() * 1000) + ")";
+                            // clone the materials too
+                            if (clone.material != undefined)
+                            {
+                                if (Array.isArray(clone.material))
+                                {
+                                    for (let i = 0; i < clone.material.length; i++)
+                                    {
+                                        clone.material[i] = clone.material[i].clone();
+                                    }
+                                }
+                                else
+                                {
+                                    clone.material = clone.material.clone();
+                                }
+                            }
                             addToScene(clone);
                             attachHandles(clone);
                         }
+                        break;
+                    case 'e':
+                        // detach handles
+                        transformControls.detach();
+                        break;
+                    case 'w':
+                        // prevent default browser behavior
+                        event.preventDefault();
+                        break;
+                    case 'r':
+                        // prevent default browser behavior
+                        event.preventDefault();
                         break;
                 }
             }
