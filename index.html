@@ -53,7 +53,10 @@
                 <span class="top-panel-option">
                     Snap
                 </span>
-                <div class="top-panel-option" style="width: 74%; opacity: 0">a</div>
+                <div class="top-panel-option" style="width: 58%; opacity: 0">a</div>
+                <span class="top-panel-option nohover" style="white-space: nowrap; text-align: right; padding-right: 15px;">
+                    <a href="https://github.com/nowaythisworks/Austin-Game-Engine" target="_blank">Version 0.1.0</a>
+                </span>
             </div>
         </div>
         <div id="left-panel" class="panel">
@@ -163,6 +166,7 @@
         });
         const attachHandles = function(item) {
             if (!retachAvailable) return;
+            if (item.userData.isEditorInteractable == false) return;
             transformControls.attach(item);
             selectedObject = item;
 
@@ -336,24 +340,17 @@
             // For each material (if any)
             if (selectedObject.material != undefined)
             {
-                // if it's not an array, make it one
-                var wasArray = false;
-                if (!Array.isArray(selectedObject.material)) {
-                    selectedObject.material = [selectedObject.material];
-                    wasArray = true;
-                }
                 // for each material
-                for (let i = 0; i < selectedObject.material.length; i++)
-                {
+                const analyzeMaterial = function(mat) {
                     // Color
                     const color = document.createElement("div");
                     color.classList.add("inspector-element");
                     color.innerHTML = "<h3>Color</h3>";
                     const colorInput = document.createElement("input");
                     colorInput.type = "color";
-                    colorInput.value = "#" + selectedObject.material[i].color.getHexString();
+                    colorInput.value = "#" + mat.color.getHexString();
                     colorInput.addEventListener("input", function() {
-                        selectedObject.material[i].color.set(colorInput.value);
+                        mat.color.set(colorInput.value);
                     });
                     color.appendChild(colorInput);
                     inspector.appendChild(color);
@@ -364,14 +361,49 @@
                     roughness.innerHTML = "<h3>Roughness</h3>";
                     const roughnessInput = document.createElement("input");
                     roughnessInput.type = "number";
-                    roughnessInput.value = selectedObject.material[i].roughness;
+                    roughnessInput.value = mat.roughness;
                     roughnessInput.addEventListener("input", function() {
-                        selectedObject.material[i].roughness = roughnessInput.value;
+                        mat.roughness = roughnessInput.value;
                     });
                     roughness.appendChild(roughnessInput);
                     inspector.appendChild(roughness);
+
+                    // Textures
+                    if (mat.hasOwnProperty("map"))
+                    {
+                        console.log("Object DOES HAVE texture maps");
+                        const textures = document.createElement("div");
+                        textures.classList.add("inspector-element");
+                        textures.innerHTML = "<h3>Textures</h3>";
+                        const texturesInput = document.createElement("input");
+                        texturesInput.type = "file";
+                        texturesInput.addEventListener("input", function() {
+                            const reader = new FileReader();
+                            reader.onload = function() {
+                                const texture = new THREE.TextureLoader().load(reader.result);
+                                mat.map = texture;
+                                mat.needsUpdate = true;
+                            }
+                            reader.readAsDataURL(texturesInput.files[0]);
+                        });
+                        textures.appendChild(texturesInput);
+                        inspector.appendChild(textures);
+                    }
+                    else
+                    {
+                        console.log("Object has no texture maps");
+                    }
                 }
-                if (wasArray) selectedObject.material = selectedObject.material[0];
+                if (!Array.isArray(selectedObject.material)) {
+                    analyzeMaterial(selectedObject.material);
+                }
+                else if (Array.isArray(selectedObject.material))
+                {
+                    for (let i = 0; i < selectedObject.material.length; i++)
+                    {
+                        analyzeMaterial(selectedObject.material[i]);
+                    }
+                }
             }
         }
         const addToScene = function(item)
@@ -423,6 +455,23 @@
             });
             list.appendChild(li);
         }
+        const addDefaultLight = function() {
+            let defaultLight = new THREE.DirectionalLight(0xffffff, 1);
+            defaultLight.name = "Directional Light";
+            addToScene(defaultLight);
+            let directionalLightHelper = new THREE.DirectionalLightHelper(defaultLight, 0.2);
+            scene.add(directionalLightHelper);
+
+            let directionalLightHelperTarget = new THREE.Mesh(
+                new THREE.SphereGeometry(0.05, 16, 16),
+                new THREE.MeshBasicMaterial({ color: 0xff0000 })
+            );
+            directionalLightHelperTarget.userData.isEditorInteractable = false;
+            defaultLight.add(directionalLightHelperTarget);
+            directionalLightHelperTarget.position.y -= 1;
+            defaultLight.target = directionalLightHelperTarget;
+        }
+        addDefaultLight();
         const removeFromScene = function(item)
         {
             // if the item is of type light, scan the scene for any helpers for it
@@ -568,14 +617,47 @@
                     const spotLightHelper = new THREE.SpotLightHelper(spotLight);
                     scene.add(spotLightHelper);
                     // create a 'target' for the spotLightHelper, that follows the position of the spotlight's 'target', and add it to the userdata
-                    const helperTarget = new THREE.Mesh(
+                    const spotLightHelperTarget = new THREE.Mesh(
                         new THREE.SphereGeometry(0.05, 16, 16),
                         new THREE.MeshBasicMaterial({ color: 0xff0000 })
                     );
-                    spotLight.add(helperTarget);
-                    helperTarget.position.y -= 2;
-                    spotLight.target = helperTarget;
+                    spotLightHelperTarget.userData.isEditorInteractable = false;
+                    spotLight.add(spotLightHelperTarget);
+                    spotLightHelperTarget.position.y -= 2;
+                    spotLight.target = spotLightHelperTarget;
                     break;
+                case "Create Directional Light":
+                    const directionalLight = new THREE.DirectionalLight(randomColor(), 1);
+                    directionalLight.name = "Directional Light - " + Math.floor(Math.random() * 1000);
+                    directionalLight.position.set(0, 2, 0);
+                    directionalLight.castShadow = true;
+                    addToScene(directionalLight);
+                    const directionalLightHelper = new THREE.DirectionalLightHelper(directionalLight, 0.2);
+                    scene.add(directionalLightHelper);
+
+                    const directionalLightHelperTarget = new THREE.Mesh(
+                        new THREE.SphereGeometry(0.05, 16, 16),
+                        new THREE.MeshBasicMaterial({ color: 0xff0000 })
+                    );
+                    directionalLightHelperTarget.userData.isEditorInteractable = false;
+                    directionalLight.add(directionalLightHelperTarget);
+                    directionalLightHelperTarget.position.y -= 2;
+                    directionalLight.target = directionalLightHelperTarget;
+                    break;
+                case "Create Hemisphere Light":
+                    const hemisphereLight = new THREE.HemisphereLight(0xffffbb, 0x080820, 1);
+                    hemisphereLight.name = "Hemisphere Light - " + Math.floor(Math.random() * 1000);
+                    addToScene(hemisphereLight);
+                    // helper
+                    const hemisphereLightHelper = new THREE.HemisphereLightHelper(hemisphereLight, 0.2);
+                    scene.add(hemisphereLightHelper);
+                    break;
+                case "Create Ambient Light":
+                    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+                    ambientLight.name = "Ambient Light - " + Math.floor(Math.random() * 1000);
+                    addToScene(ambientLight);
+                    break;
+                //  ### Object Manipulation
                 case "Delete Object":
                     removeFromScene(selectedObject);
                     break;
@@ -600,6 +682,9 @@
                 options.push("[] Add Lighting");
                 options.push("Create Point Light");
                 options.push("Create Spot Light");
+                options.push("Create Directional Light");
+                options.push("Create Hemisphere Light");
+                options.push("Create Ambient Light");
             }
             if (clickedElement.parentElement.id == "scene-objects-list") {
                 options.push("Delete Object");
@@ -857,6 +942,11 @@
             /* vertical align spans in a div with 100% height */
             display: table-cell;
             vertical-align: middle;
+        }
+
+        .nohover:hover {
+            background-color: var(--editor-bg-color) !important;
+            cursor: default !important;
         }
 
         .top-panel-option:hover {
