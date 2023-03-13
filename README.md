@@ -1,7 +1,10 @@
 # Austin's Game Engine
 my javascript game engine
 
-![empty editor window](https://user-images.githubusercontent.com/66288732/224537882-00a248b2-4387-46b4-92c6-4019cc78ee49.png)
+## game in editor --> game at runtime
+![populated editor window](https://user-images.githubusercontent.com/66288732/224681885-ac630f9f-ac45-4eec-990d-262076f8e011.png)
+![game at runtime](https://user-images.githubusercontent.com/66288732/224682085-b2525a69-6416-4e04-a3e4-20b35997076b.png)
+
 
 ### Installation
 - git clone this repository
