@@ -1,0 +1,150 @@
+<!-- HTML layout with a left side panel, top navigation bar, right side panel, and bottom panel -->
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Loading...</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat&display=swap" rel="stylesheet">
+
+    <script async src="https://unpkg.com/es-module-shims@1.6.3/dist/es-module-shims.js"></script>
+
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://unpkg.com/three@0.150.1/build/three.module.js",
+          "three/addons/": "https://unpkg.com/three@0.150.1/examples/jsm/"
+        }
+      }
+    </script>
+</head>
+
+<body>
+        <!-- Game Window -->
+        <div id="center-panel" class="panel">
+            <h1>Loading . . .</h1>
+        </div>
+    </div>
+
+    <script type="module">
+        // ### IMPORTANT METADATA
+        const editorVersion = "0.1.0"
+        document.title = "Austin's Game Engine " + editorVersion
+
+        //  ### IMPORTS
+        import * as THREE from 'three';
+        import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
+
+        // ### CANVAS INITIALIZATION
+        const editorWindow = document.querySelector("#center-panel");
+        editorWindow.innerHTML = "";
+        const canvas = document.createElement("canvas");
+        canvas.id = "editor-canvas";
+        canvas.width = editorWindow.clientWidth;
+        canvas.height = editorWindow.clientHeight;
+        editorWindow.appendChild(canvas);
+
+        // ### OPENING ###
+        // we will ask the user for a file, and load it into the scene
+        const clock = new THREE.Clock();
+        const importProject = function () {
+            console.log("Importing...")
+
+            // read the file in /saves/savedata.json
+            
+            const fs = require('fs');
+            const data = JSON.parse(fs.readFileSync('saves/savedata.json', 'utf8'));
+
+            // load the scene
+            const loader = new THREE.ObjectLoader();
+            const gameScene = loader.parse(data.scene);
+            console.log(gameScene);
+
+            // let the scene render in the canvas
+            const renderer = new THREE.WebGLRenderer({ canvas: canvas });
+            let camera;
+            // find the first camera in the scene
+            gameScene.traverse(function (child) {
+                if (child.isCamera == true) {
+                    camera = child;
+                }
+            });
+
+            // pointer lock controls
+            const controls = new PointerLockControls(camera, canvas);
+            controls.addEventListener('lock', function () {
+                console.log("Pointer Lock Controls Enabled");
+            });
+            controls.addEventListener('unlock', function () {
+                console.log("Pointer Lock Controls Disabled");
+            });
+            gameScene.add(controls.getObject());
+
+            // ### KEYBOARD INPUT ###
+            const keyboard = {};
+            document.addEventListener('keydown', function (event) {
+                keyboard[event.code] = true;
+            });
+            document.addEventListener('keyup', function (event) {
+                keyboard[event.code] = false;
+            });
+
+            // ### MOUSE INPUT ###
+            let mouseDown = false;
+            document.addEventListener('mousedown', function (event) {
+                mouseDown = true;
+                controls.lock();
+            });
+
+            // ### GAME LOOP ###
+            const gameLoop = function () {
+                // ### PLAYER MOVEMENT ###
+                const playerMoveSpeed = 10;
+                const delta = clock.getDelta();
+                let xAxis = keyboard["KeyD"] - keyboard["KeyA"];
+                let zAxis = keyboard["KeyW"] - keyboard["KeyS"];
+
+                // if NaN or undefined, set to 0
+                if (isNaN(xAxis)) xAxis = 0;
+                if (isNaN(zAxis)) zAxis = 0;
+
+                controls.moveForward(zAxis * playerMoveSpeed * delta);
+                controls.moveRight(xAxis * playerMoveSpeed * delta);
+
+
+                // render the scene
+                renderer.render(gameScene, camera);
+
+                // call the game loop again
+                requestAnimationFrame(gameLoop);
+            }
+
+            // start the game loop
+            gameLoop();
+        }
+        importProject();
+
+    </script>
+
+    <style>
+        * {
+            margin: 0;
+            overflow: hidden;
+            font-family: 'Montserrat', sans-serif;
+            user-select: none;
+        }
+
+        #center-panel {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+        }
+    </style>
+</body>
+
+</html>

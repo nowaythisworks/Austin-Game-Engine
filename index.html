@@ -1,10 +1,11 @@
 <!-- HTML layout with a left side panel, top navigation bar, right side panel, and bottom panel -->
 <html>
+
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Austin's Game Engine 0.1.0</title>
-    
+    <title>Loading...</title>
+
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat&display=swap" rel="stylesheet">
@@ -35,11 +36,11 @@
     <div class="container">
         <div id="top-panel" class="panel">
             <div id="top-panel-bar">
-                <span class="top-panel-option">
-                    File
+                <span class="top-panel-option" id="save-button">
+                    Save
                 </span>
-                <span class="top-panel-option">
-                    Edit
+                <span class="top-panel-option" id="import-button">
+                    Open
                 </span>
                 <span class="top-panel-option">
                     View
@@ -47,15 +48,16 @@
                 <span class="top-panel-option">
                     Help
                 </span>
-                <span class="top-panel-option" style="color:#494949">
+                <span class="top-panel-option" style="color:#494949; pointer-events: none;">
                     |
                 </span>
-                <span class="top-panel-option">
-                    Snap
+                <span class="top-panel-option" id="export-button">
+                    Export
                 </span>
-                <div class="top-panel-option" style="width: 58%; opacity: 0">a</div>
-                <span class="top-panel-option nohover" style="white-space: nowrap; text-align: right; padding-right: 15px;">
-                    <a href="https://github.com/nowaythisworks/Austin-Game-Engine" target="_blank">Version 0.1.0</a>
+                <div class="top-panel-option" style="width: 59%; opacity: 0">a</div>
+                <span class="top-panel-option nohover"
+                    style="white-space: nowrap; text-align: right; padding-right: 15px;">
+                    <a href="game.html">Launch Runner</a>
                 </span>
             </div>
         </div>
@@ -83,11 +85,15 @@
     </div>
 
     <script type="module">
+        // ### IMPORTANT METADATA
+        const editorVersion = "0.1.0"
+        document.title = "Austin's Game Engine " + editorVersion
+
         //  ### IMPORTS
         import * as THREE from 'three';
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         import { TransformControls } from 'three/addons/controls/TransformControls.js';
-        
+
         // ### CANVAS INITIALIZATION
         const editorWindow = document.querySelector("#center-panel");
         editorWindow.innerHTML = "";
@@ -99,7 +105,8 @@
 
 
         // ### THREE.JS RENDERER INITIALIZATION
-        const scene = new THREE.Scene();
+        const DEFAULTOBJECTS = [];
+        var scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(40, canvas.width / canvas.height, 0.1, 1000);
         camera.position.x = -27.65656251980899;
         camera.position.y = 22.536512419213917;
@@ -110,9 +117,14 @@
         const renderer = new THREE.WebGLRenderer({ canvas: canvas });
         renderer.setPixelRatio(window.devicePixelRatio);
         const gridHelper = new THREE.GridHelper(25, 12);
+        gridHelper.name = "GridHelper";
+        gridHelper.userData.showInHierarchy = false;
+        DEFAULTOBJECTS.push(gridHelper);
         scene.add(gridHelper);
         const controls = new OrbitControls(camera, canvas);
-        window.addEventListener("resize", function() {
+        controls.name = "OrbitControls";
+        DEFAULTOBJECTS.push(controls);
+        window.addEventListener("resize", function () {
             canvas.width = editorWindow.clientWidth;
             canvas.height = editorWindow.clientHeight;
             camera.aspect = canvas.width / canvas.height;
@@ -123,7 +135,7 @@
 
 
         // ### ANIMATION LOOP
-        const animate = function() {
+        const animate = function () {
             requestAnimationFrame(animate);
             controls.update();
             renderer.render(scene, camera);
@@ -132,19 +144,21 @@
 
 
         //  ### SIMPLE FUNCTIONS
-        const randomColor = function() { return new THREE.Color(0xffffff * Math.random()); }
+        const randomColor = function () { return new THREE.Color(0xffffff * Math.random()); }
         const transformControls = new TransformControls(camera, canvas);
+        transformControls.name = "TransformControls"
+        transformControls.userData.showInHierarchy = false;
         var selectedObject;
         var retachAvailable = true;
         transformControls.size = 1.25;
+        DEFAULTOBJECTS.push(transformControls);
         scene.add(transformControls);
         transformControls.addEventListener('dragging-changed', function (event) {
             controls.enabled = !event.value;
             retachAvailable = !event.value;
 
             // if the object type includes "LightHelper", then set the light in the helper's userdata's transform to the light helper
-            if (selectedObject.type.includes("LightHelper"))
-            {
+            if (selectedObject.type.includes("LightHelper")) {
                 // Position
                 selectedObject.light.position.x = selectedObject.position.x;
                 selectedObject.light.position.y = selectedObject.position.y;
@@ -155,8 +169,7 @@
                 selectedObject.light.rotation.y = selectedObject.rotation.y;
                 selectedObject.light.rotation.z = selectedObject.rotation.z;
 
-                if (selectedObject.light.target != undefined)
-                {
+                if (selectedObject.light.target != undefined) {
                     // Target
                     selectedObject.light.target.position.x = selectedObject.userData.target.position.x;
                     selectedObject.light.target.position.y = selectedObject.userData.target.position.y;
@@ -164,9 +177,10 @@
                 }
             }
         });
-        const attachHandles = function(item) {
+        const attachHandles = function (item) {
+            console.log(item);
             if (!retachAvailable) return;
-            if (item.userData.isEditorInteractable == false) return;
+            if (item.userData.selectParentInstead == true) item = item.parent;
             transformControls.attach(item);
             selectedObject = item;
 
@@ -176,8 +190,7 @@
             const inspector = document.querySelector("#object-inspector-elements");
             inspector.innerHTML = "";
 
-            if (selectedObject.isObject3D == true)
-            {
+            if (selectedObject.isObject3D == true) {
                 console.log(selectedObject);
                 // Position (X, Y, Z) in a row
                 const position = document.createElement("div");
@@ -187,21 +200,21 @@
                 positionX.type = "number";
                 positionX.value = selectedObject.position.x;
                 positionX.style.width = "75px";
-                positionX.addEventListener("input", function() {
+                positionX.addEventListener("input", function () {
                     selectedObject.position.x = positionX.value;
                 });
                 const positionY = document.createElement("input");
                 positionY.type = "number";
                 positionY.value = selectedObject.position.y;
                 positionY.style.width = "75px";
-                positionY.addEventListener("input", function() {
+                positionY.addEventListener("input", function () {
                     selectedObject.position.y = positionY.value;
                 });
                 const positionZ = document.createElement("input");
                 positionZ.type = "number";
                 positionZ.value = selectedObject.position.z;
                 positionZ.style.width = "75px";
-                positionZ.addEventListener("input", function() {
+                positionZ.addEventListener("input", function () {
                     selectedObject.position.z = positionZ.value;
                 });
                 position.appendChild(positionX);
@@ -217,21 +230,21 @@
                 rotationX.type = "number";
                 rotationX.value = selectedObject.rotation.x;
                 rotationX.style.width = "75px";
-                rotationX.addEventListener("input", function() {
+                rotationX.addEventListener("input", function () {
                     selectedObject.rotation.x = rotationX.value * Math.PI / 180;
                 });
                 const rotationY = document.createElement("input");
                 rotationY.type = "number";
                 rotationY.value = selectedObject.rotation.y;
                 rotationY.style.width = "75px";
-                rotationY.addEventListener("input", function() {
+                rotationY.addEventListener("input", function () {
                     selectedObject.rotation.y = rotationY.value * Math.PI / 180;
                 });
                 const rotationZ = document.createElement("input");
                 rotationZ.type = "number";
                 rotationZ.value = selectedObject.rotation.z;
                 rotationZ.style.width = "75px";
-                rotationZ.addEventListener("input", function() {
+                rotationZ.addEventListener("input", function () {
                     selectedObject.rotation.z = rotationZ.value * Math.PI / 180;
                 });
                 rotation.appendChild(rotationX);
@@ -247,21 +260,21 @@
                 scaleX.type = "number";
                 scaleX.value = selectedObject.scale.x;
                 scaleX.style.width = "75px";
-                scaleX.addEventListener("input", function() {
+                scaleX.addEventListener("input", function () {
                     selectedObject.scale.x = scaleX.value;
                 });
                 const scaleY = document.createElement("input");
                 scaleY.type = "number";
                 scaleY.value = selectedObject.scale.y;
                 scaleY.style.width = "75px";
-                scaleY.addEventListener("input", function() {
+                scaleY.addEventListener("input", function () {
                     selectedObject.scale.y = scaleY.value;
                 });
                 const scaleZ = document.createElement("input");
                 scaleZ.type = "number";
                 scaleZ.value = selectedObject.scale.z;
                 scaleZ.style.width = "75px";
-                scaleZ.addEventListener("input", function() {
+                scaleZ.addEventListener("input", function () {
                     selectedObject.scale.z = scaleZ.value;
                 });
                 scale.appendChild(scaleX);
@@ -270,8 +283,7 @@
                 inspector.appendChild(scale);
             }
             // if it's a light
-            if (selectedObject.isLight == true)
-            {
+            if (selectedObject.isLight == true) {
                 // Type of Light
                 const type = document.createElement("div");
                 type.classList.add("inspector-element");
@@ -279,7 +291,7 @@
                 const typeInput = document.createElement("select");
                 typeInput.innerHTML = "<option value='AmbientLight'>Ambient Light</option><option value='DirectionalLight'>Directional Light</option><option value='PointLight'>Point Light</option><option value='SpotLight'>Spot Light</option>";
                 typeInput.value = selectedObject.type;
-                typeInput.addEventListener("input", function() {
+                typeInput.addEventListener("input", function () {
                     selectedObject.type = typeInput.value;
                 });
                 type.appendChild(typeInput);
@@ -292,7 +304,7 @@
                 const colorInput = document.createElement("input");
                 colorInput.type = "color";
                 colorInput.value = "#" + selectedObject.color.getHexString();
-                colorInput.addEventListener("input", function() {
+                colorInput.addEventListener("input", function () {
                     selectedObject.color.set(colorInput.value);
                 });
                 color.appendChild(colorInput);
@@ -305,7 +317,7 @@
                 const intensityInput = document.createElement("input");
                 intensityInput.type = "number";
                 intensityInput.value = selectedObject.intensity;
-                intensityInput.addEventListener("input", function() {
+                intensityInput.addEventListener("input", function () {
                     selectedObject.intensity = intensityInput.value;
                 });
                 intensity.appendChild(intensityInput);
@@ -318,7 +330,7 @@
                 const rangeInput = document.createElement("input");
                 rangeInput.type = "number";
                 rangeInput.value = selectedObject.distance;
-                rangeInput.addEventListener("input", function() {
+                rangeInput.addEventListener("input", function () {
                     selectedObject.distance = rangeInput.value;
                 });
                 range.appendChild(rangeInput);
@@ -331,17 +343,16 @@
                 const shadowsInput = document.createElement("input");
                 shadowsInput.type = "checkbox";
                 shadowsInput.checked = selectedObject.castShadow;
-                shadowsInput.addEventListener("input", function() {
+                shadowsInput.addEventListener("input", function () {
                     selectedObject.castShadow = shadowsInput.checked;
                 });
                 shadows.appendChild(shadowsInput);
                 inspector.appendChild(shadows);
             }
             // For each material (if any)
-            if (selectedObject.material != undefined)
-            {
+            if (selectedObject.material != undefined) {
                 // for each material
-                const analyzeMaterial = function(mat) {
+                const analyzeMaterial = function (mat) {
                     // Color
                     const color = document.createElement("div");
                     color.classList.add("inspector-element");
@@ -349,7 +360,7 @@
                     const colorInput = document.createElement("input");
                     colorInput.type = "color";
                     colorInput.value = "#" + mat.color.getHexString();
-                    colorInput.addEventListener("input", function() {
+                    colorInput.addEventListener("input", function () {
                         mat.color.set(colorInput.value);
                     });
                     color.appendChild(colorInput);
@@ -362,24 +373,23 @@
                     const roughnessInput = document.createElement("input");
                     roughnessInput.type = "number";
                     roughnessInput.value = mat.roughness;
-                    roughnessInput.addEventListener("input", function() {
+                    roughnessInput.addEventListener("input", function () {
                         mat.roughness = roughnessInput.value;
                     });
                     roughness.appendChild(roughnessInput);
                     inspector.appendChild(roughness);
 
                     // Textures
-                    if (mat.hasOwnProperty("map"))
-                    {
+                    if (mat.hasOwnProperty("map")) {
                         console.log("Object DOES HAVE texture maps");
                         const textures = document.createElement("div");
                         textures.classList.add("inspector-element");
                         textures.innerHTML = "<h3>Textures</h3>";
                         const texturesInput = document.createElement("input");
                         texturesInput.type = "file";
-                        texturesInput.addEventListener("input", function() {
+                        texturesInput.addEventListener("input", function () {
                             const reader = new FileReader();
-                            reader.onload = function() {
+                            reader.onload = function () {
                                 const texture = new THREE.TextureLoader().load(reader.result);
                                 mat.map = texture;
                                 mat.needsUpdate = true;
@@ -389,25 +399,21 @@
                         textures.appendChild(texturesInput);
                         inspector.appendChild(textures);
                     }
-                    else
-                    {
+                    else {
                         console.log("Object has no texture maps");
                     }
                 }
                 if (!Array.isArray(selectedObject.material)) {
                     analyzeMaterial(selectedObject.material);
                 }
-                else if (Array.isArray(selectedObject.material))
-                {
-                    for (let i = 0; i < selectedObject.material.length; i++)
-                    {
+                else if (Array.isArray(selectedObject.material)) {
+                    for (let i = 0; i < selectedObject.material.length; i++) {
                         analyzeMaterial(selectedObject.material[i]);
                     }
                 }
             }
         }
-        const addToScene = function(item)
-        {
+        const addToScene = function (item) {
             scene.add(item);
             document.querySelector("#object-counter").innerHTML = parseInt(document.querySelector("#object-counter").innerHTML) + 1;
             if (document.querySelector("#object-counter").innerHTML == 1) document.querySelector("#object-counter-label").innerHTML = " total object";
@@ -417,22 +423,20 @@
 
             const li = document.createElement("li");
             li.innerHTML = item.name;
-            li.addEventListener("click", function() {
+            li.addEventListener("click", function () {
                 // add transform controls to the item
                 attachHandles(item);
                 // add the "active" class to the <li>
                 li.classList.add("active");
                 // remove the "active" class from all other LIs
-                for (let i = 0; i < list.children.length; i++)
-                {
-                    if (list.children[i] !== li)
-                    {
+                for (let i = 0; i < list.children.length; i++) {
+                    if (list.children[i] !== li) {
                         list.children[i].classList.remove("active");
                     }
                 }
             });
             // doube click
-            li.addEventListener("dblclick", function() {
+            li.addEventListener("dblclick", function () {
                 // replace the innerHTML with an <input> element
                 const input = document.createElement("input");
                 input.value = item.name;
@@ -440,22 +444,36 @@
                 li.appendChild(input);
                 input.focus();
                 input.id = "text-input"
-                const cleanup = function() {
+                const cleanup = function () {
                     item.name = input.value;
                     li.innerHTML = item.name;
                     input.remove();
                 }
                 input.addEventListener("blur", cleanup);
-                input.addEventListener("keydown", function(event) {
+                input.addEventListener("keydown", function (event) {
                     if (event.key === "Enter") cleanup();
                 });
-                input.addEventListener("click", function(event) {
+                input.addEventListener("click", function (event) {
                     event.stopPropagation();
                 });
             });
             list.appendChild(li);
         }
-        const addDefaultLight = function() {
+        let cameraHelper;
+        const addDefaultCamera = function () {
+            // adds a camerahelper as a placeholder for the camera
+            let defaultCamera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            defaultCamera.name = "Main Camera";
+            defaultCamera.position.z = 5;
+            addToScene(defaultCamera);
+
+            cameraHelper = new THREE.CameraHelper(defaultCamera);
+            cameraHelper.userData.importOnLoad = false;
+            cameraHelper.userData.showInHierarchy = false;
+            scene.add(cameraHelper);
+            DEFAULTOBJECTS.push(defaultCamera);
+        }
+        const addDefaultLight = function () {
             let defaultLight = new THREE.DirectionalLight(0xffffff, 1);
             defaultLight.name = "Directional Light";
             addToScene(defaultLight);
@@ -466,21 +484,23 @@
                 new THREE.SphereGeometry(0.05, 16, 16),
                 new THREE.MeshBasicMaterial({ color: 0xff0000 })
             );
-            directionalLightHelperTarget.userData.isEditorInteractable = false;
+            directionalLightHelperTarget.userData.selectParentInstead = true;
+            directionalLightHelperTarget.userData.importOnLoad = false;
+            directionalLightHelper.userData.importOnLoad = false;
+            directionalLightHelperTarget.userData.showInHierarchy = false;
+            directionalLightHelper.userData.showInHierarchy = false;
             defaultLight.add(directionalLightHelperTarget);
             directionalLightHelperTarget.position.y -= 1;
             defaultLight.target = directionalLightHelperTarget;
+            DEFAULTOBJECTS.push(defaultLight);
         }
         addDefaultLight();
-        const removeFromScene = function(item)
-        {
+        addDefaultCamera();
+        const removeFromScene = function (item) {
             // if the item is of type light, scan the scene for any helpers for it
-            if (item.isLight == true)
-            {
-                for (let i = 0; i < scene.children.length; i++)
-                {
-                    if (scene.children[i].light != undefined && scene.children[i].light == item)
-                    {
+            if (item.isLight == true) {
+                for (let i = 0; i < scene.children.length; i++) {
+                    if (scene.children[i].light != undefined && scene.children[i].light == item) {
                         scene.remove(scene.children[i]);
                     }
                 }
@@ -493,24 +513,20 @@
 
             // remove the <li> from left-panel with the item's name
             const list = document.querySelector("#scene-objects-list");
-            for (let i = 0; i < list.children.length; i++)
-            {
-                if (list.children[i].innerHTML === item.name)
-                {
+            for (let i = 0; i < list.children.length; i++) {
+                if (list.children[i].innerHTML === item.name) {
                     list.children[i].remove();
                 }
             }
             // detach handles
             transformControls.detach();
         }
-        document.body.addEventListener('keydown', function(event) {
+        document.body.addEventListener('keydown', function (event) {
             // if press 'del' and there is an object selected, remove it
-            if (event.key == "Delete" && transformControls.object != undefined)
-            {
+            if (event.key == "Delete" && transformControls.object != undefined) {
                 removeFromScene(transformControls.object);
             }
-            if (transformControls.object != undefined)
-            {
+            if (transformControls.object != undefined) {
                 switch (event.key) {
                     case 'w':
                         transformControls.setMode("translate");
@@ -527,8 +543,7 @@
                 }
             }
             // if holding down control
-            if (event.ctrlKey)
-            {
+            if (event.ctrlKey) {
                 switch (event.key) {
                     case 'z':
                         undo();
@@ -540,22 +555,17 @@
                         // prevent browser bookmark
                         event.preventDefault();
                         // if there is a selected object, duplicate it
-                        if (transformControls.object != undefined)
-                        {
+                        if (transformControls.object != undefined) {
                             const clone = transformControls.object.clone();
                             clone.name = transformControls.object.name + " (clone " + Math.floor(Math.random() * 1000) + ")";
                             // clone the materials too
-                            if (clone.material != undefined)
-                            {
-                                if (Array.isArray(clone.material))
-                                {
-                                    for (let i = 0; i < clone.material.length; i++)
-                                    {
+                            if (clone.material != undefined) {
+                                if (Array.isArray(clone.material)) {
+                                    for (let i = 0; i < clone.material.length; i++) {
                                         clone.material[i] = clone.material[i].clone();
                                     }
                                 }
-                                else
-                                {
+                                else {
                                     clone.material = clone.material.clone();
                                 }
                             }
@@ -577,15 +587,17 @@
                         break;
                 }
             }
+            // debug commands
+            if (event.key == "s") {
+                console.log(scene);
+            }
         });
 
 
         // ### CONTEXT MENU
         const rightClickMenu = document.querySelector("#right-click-menu");
-        const contextMenuClick = function(action)
-        {
-            switch (action)
-            {
+        const contextMenuClick = function (action) {
+            switch (action) {
                 //  ### Object Creation
                 case "Create Mesh":
                     const mesh = new THREE.Mesh(
@@ -601,6 +613,8 @@
                     light.position.y = 1.5;
                     addToScene(light);
                     const helper = new THREE.PointLightHelper(light, 0.2);
+                    helper.userData.importOnLoad = false;
+                    helper.userData.showInHierarchy = false;
                     scene.add(helper);
                     break;
                 case "Create Spot Light":
@@ -621,7 +635,9 @@
                         new THREE.SphereGeometry(0.05, 16, 16),
                         new THREE.MeshBasicMaterial({ color: 0xff0000 })
                     );
-                    spotLightHelperTarget.userData.isEditorInteractable = false;
+                    spotLightHelperTarget.userData.selectParentInstead = true;
+                    spotLightHelperTarget.userData.importOnLoad = false;
+                    spotLightHelperTarget.userData.showInHierarchy = false;
                     spotLight.add(spotLightHelperTarget);
                     spotLightHelperTarget.position.y -= 2;
                     spotLight.target = spotLightHelperTarget;
@@ -639,7 +655,11 @@
                         new THREE.SphereGeometry(0.05, 16, 16),
                         new THREE.MeshBasicMaterial({ color: 0xff0000 })
                     );
-                    directionalLightHelperTarget.userData.isEditorInteractable = false;
+                    directionalLightHelperTarget.userData.selectParentInstead = true;
+                    directionalLightHelperTarget.userData.importOnLoad = false;
+                    directionalLightHelper.userData.importOnLoad = false;
+                    directionalLightHelperTarget.userData.showInHierarchy = false;
+                    directionalLightHelper.userData.importOnLshowInHierarchyoad = false;
                     directionalLight.add(directionalLightHelperTarget);
                     directionalLightHelperTarget.position.y -= 2;
                     directionalLight.target = directionalLightHelperTarget;
@@ -650,6 +670,7 @@
                     addToScene(hemisphereLight);
                     // helper
                     const hemisphereLightHelper = new THREE.HemisphereLightHelper(hemisphereLight, 0.2);
+                    hemisphereLightHelper.userData.importOnLoad = false;
                     scene.add(hemisphereLightHelper);
                     break;
                 case "Create Ambient Light":
@@ -671,7 +692,7 @@
                     break;
             }
         }
-        document.body.addEventListener("contextmenu", function(e) {
+        document.body.addEventListener("contextmenu", function (e) {
             e.preventDefault();
             const clickedElement = document.elementFromPoint(e.clientX, e.clientY);
             if (clickedElement.id == "editor-canvas") return;
@@ -710,7 +731,7 @@
                 option.innerHTML = options[i];
                 rightClickMenu.appendChild(option);
                 // add a click event listener
-                option.addEventListener("click", function() {
+                option.addEventListener("click", function () {
                     // handle contextMenuClick with the innerhtml
                     contextMenuClick(option.innerHTML);
                 });
@@ -721,12 +742,12 @@
             rightClickMenu.style.top = e.clientY + "px";
         });
         // on click out
-        document.body.addEventListener("click", function(e) {
+        document.body.addEventListener("click", function (e) {
             rightClickMenu.style.display = "none";
         });
 
         // Editor Click Events
-        canvas.addEventListener("click", function(e) {
+        canvas.addEventListener("click", function (e) {
 
             // shoot ray until first target is hit, attach transformControls to it
             const raycaster = new THREE.Raycaster();
@@ -737,8 +758,8 @@
             const x = event.clientX - rect.left;
             const y = event.clientY - rect.top;
 
-            mouse.x = ( x / canvas.clientWidth ) *  2 - 1;
-            mouse.y = ( y / canvas.clientHeight) * - 2 + 1
+            mouse.x = (x / canvas.clientWidth) * 2 - 1;
+            mouse.y = (y / canvas.clientHeight) * - 2 + 1
 
             raycaster.setFromCamera(mouse, camera);
             const intersects = raycaster.intersectObjects(scene.children, true);
@@ -746,12 +767,13 @@
             let index = 0;
             if (intersects.length > 0) {
                 // organize the interects by distance
-                intersects.sort(function(a, b) {
+                intersects.sort(function (a, b) {
                     return a.distance - b.distance;
                 });
                 const disallowedObjects = [
                     "TransformControlsGizmo",
                     "TransformControlsPlane",
+                    "CameraHelper",
                     "GridHelper",
                     "LineSegments",
                     "Line"
@@ -787,6 +809,117 @@
             }
         });
 
+        // ### EXPORTING ###
+        // we will save the scene data into a JSON file, excluding any children we dont want
+
+        const saveProject = function () {
+            console.log("Saving...")
+
+            const gameSceneSave = scene.toJSON();
+            const saveData = {
+                meta: {
+                    // Editor Infos
+                    version: editorVersion,
+                    time: new Date().getTime()
+                },
+                scene: gameSceneSave
+            }
+
+            // save to file
+            var ipc = require('electron').ipcRenderer;
+            ipc.send('save-file', JSON.stringify(saveData, null, 4));
+
+        }
+        document.querySelector("#save-button").addEventListener("click", function () {
+            saveProject();
+        });
+
+        // ### UPDATING HIERARCHY PANEL ###
+        const updateLeftPanel = function () {
+            const list = document.querySelector("#scene-objects-list");
+            list.innerHTML = "";
+            for (let i = 0; i < scene.children.length; i++) {
+                // if the userdata has importOnLoad as false, skip
+                if (scene.children[i].userData.showInHierarchy == false) continue;
+
+                const item = document.createElement("li");
+                item.innerHTML = scene.children[i].name;
+                list.appendChild(item);
+
+                
+                item.addEventListener("click", function () {
+                    // add transform controls to the item
+                    var sceneObject;
+                    for (let i = 0; i < scene.children.length; i++) {
+                        if (scene.children[i].name == item.innerHTML) {
+                            sceneObject = scene.children[i];
+                            break;
+                        }
+                    }
+                    attachHandles(sceneObject);
+                    // add the "active" class to the <li>
+                        item.classList.add("active");
+                    // remove the "active" class from all other LIs
+                    for (let i = 0; i < list.children.length; i++) {
+                        if (list.children[i] !== item) {
+                            list.children[i].classList.remove("active");
+                        }
+                    }
+                });
+            }
+        }
+
+        // ### OPENING ###
+        // we will ask the user for a file, and load it into the scene
+        const importProject = function () {
+            console.log("Importing...")
+
+            // ask for a file
+            var input = document.createElement('input');
+            input.type = 'file';
+            input.onchange = e => {
+                var file = e.target.files[0];
+                var reader = new FileReader();
+                reader.readAsText(file, 'UTF-8');
+
+                reader.onload = readerEvent => {
+                    var content = readerEvent.target.result;
+                    const saveData = JSON.parse(content);
+                    // load the scene
+                    const loader = new THREE.ObjectLoader();
+                    const gameScene = loader.parse(saveData.scene);
+                    // for each child of gamescene (including all children of children), if it has userdata "importOnLoad" false, remove it
+                    for (let i = 0; i < gameScene.children.length; i++) {
+                        if (gameScene.children[i].userData.importOnLoad == false) {
+                            gameScene.remove(gameScene.children[i]);
+                            i--;
+                        }
+                    }
+
+                    // remove every child of scene that is not in DEFAULTOBJECTS
+                    for (let i = 0; i < scene.children.length; i++) {
+                        // if the child is not in the DEFAULTOBJECTS array, remove it
+                        if (!DEFAULTOBJECTS.includes(scene.children[i])) {
+                            scene.remove(scene.children[i]);
+                            i--;
+                        }
+                    }
+
+                    // add the children of gamescene to scene
+                    for (let i = 0; i < gameScene.children.length; i++) {
+                        scene.add(gameScene.children[i]);
+                    }
+                    
+                    updateLeftPanel();
+                }
+            }
+            input.click();
+        }
+
+        document.querySelector("#import-button").addEventListener("click", function () {
+            importProject();
+        });
+
     </script>
 
     <style>
@@ -802,6 +935,7 @@
             overflow: hidden;
             color: white;
             font-family: 'Montserrat', sans-serif;
+            user-select: none;
         }
 
         #right-click-menu {
@@ -830,7 +964,7 @@
         }
 
         #right-click-menu li:hover {
-            background:rgb(64, 64, 64);
+            background: rgb(64, 64, 64);
             cursor: pointer;
         }
 
@@ -838,6 +972,7 @@
             0% {
                 opacity: 0;
             }
+
             100% {
                 opacity: 1;
             }
@@ -852,7 +987,7 @@
             grid-gap: 0px;
             background-color: var(--editor-bg-color);
             padding: 0px;
-            
+
         }
 
         /* Universal for all panels */
@@ -880,12 +1015,12 @@
         }
 
         #left-panel li:hover {
-            background:rgb(64, 64, 64);
+            background: rgb(64, 64, 64);
             cursor: pointer;
         }
 
         .active {
-            background:rgb(40, 40, 40);
+            background: rgb(40, 40, 40);
         }
 
         /* Style the top panel */
@@ -959,7 +1094,8 @@
             height: 100%;
         }
 
-        input, select {
+        input,
+        select {
             border-radius: 2px;
             border: none;
             background: #242424;
@@ -970,4 +1106,5 @@
         }
     </style>
 </body>
+
 </html>
