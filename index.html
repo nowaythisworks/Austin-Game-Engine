@@ -53,16 +53,7 @@
                 <span class="top-panel-option">
                     Snap
                 </span>
-                <span class="top-panel-option">
-                    Object
-                </span>
-                <span class="top-panel-option">
-                    View
-                </span>
-                <span class="top-panel-option">
-                    Help
-                </span>
-                <div  class="top-panel-option" style="width: 58%; opacity: 0">a</div>
+                <div class="top-panel-option" style="width: 74%; opacity: 0">a</div>
             </div>
         </div>
         <div id="left-panel" class="panel">
@@ -132,7 +123,6 @@
         const animate = function() {
             requestAnimationFrame(animate);
             controls.update();
-            console.log(camera);
             renderer.render(scene, camera);
         };
         animate();
@@ -141,14 +131,36 @@
         //  ### SIMPLE FUNCTIONS
         const randomColor = function() { return new THREE.Color(0xffffff * Math.random()); }
         const transformControls = new TransformControls(camera, canvas);
+        var selectedObject;
         var retachAvailable = true;
         transformControls.size = 1.25;
         scene.add(transformControls);
         transformControls.addEventListener('dragging-changed', function (event) {
             controls.enabled = !event.value;
             retachAvailable = !event.value;
+
+            // if the object type includes "LightHelper", then set the light in the helper's userdata's transform to the light helper
+            if (selectedObject.type.includes("LightHelper"))
+            {
+                // Position
+                selectedObject.light.position.x = selectedObject.position.x;
+                selectedObject.light.position.y = selectedObject.position.y;
+                selectedObject.light.position.z = selectedObject.position.z;
+
+                // Rotation
+                selectedObject.light.rotation.x = selectedObject.rotation.x;
+                selectedObject.light.rotation.y = selectedObject.rotation.y;
+                selectedObject.light.rotation.z = selectedObject.rotation.z;
+
+                if (selectedObject.light.target != undefined)
+                {
+                    // Target
+                    selectedObject.light.target.position.x = selectedObject.userData.target.position.x;
+                    selectedObject.light.target.position.y = selectedObject.userData.target.position.y;
+                    selectedObject.light.target.position.z = selectedObject.userData.target.position.z;
+                }
+            }
         });
-        var selectedObject;
         const attachHandles = function(item) {
             if (!retachAvailable) return;
             transformControls.attach(item);
@@ -324,51 +336,42 @@
             // For each material (if any)
             if (selectedObject.material != undefined)
             {
-                // if it's an array
-                if (Array.isArray(selectedObject.material))
-                {
-                    for (let i = 0; i < selectedObject.material.length; i++)
-                    {
-                        const material = selectedObject.material[i];
-                        const materialInspector = document.createElement("div");
-                        materialInspector.classList.add("inspector-element");
-                        materialInspector.innerHTML = "<h3>Material " + i + "</h3>";
-                        // Color
-                        const color = document.createElement("div");
-                        color.classList.add("inspector-element");
-                        color.innerHTML = "<h3>Color</h3>";
-                        const colorInput = document.createElement("input");
-                        colorInput.type = "color";
-                        colorInput.value = "#" + material.color.getHexString();
-                        colorInput.addEventListener("input", function() {
-                            material.color.set(colorInput.value);
-                        });
-                        color.appendChild(colorInput);
-                        materialInspector.appendChild(color);
-                        inspector.appendChild(materialInspector);
-                    }
+                // if it's not an array, make it one
+                var wasArray = false;
+                if (!Array.isArray(selectedObject.material)) {
+                    selectedObject.material = [selectedObject.material];
+                    wasArray = true;
                 }
-                // if it's a single material
-                else
+                // for each material
+                for (let i = 0; i < selectedObject.material.length; i++)
                 {
-                    const material = selectedObject.material;
-                    const materialInspector = document.createElement("div");
-                    materialInspector.classList.add("inspector-element");
-                    materialInspector.innerHTML = "<h3>Material</h3>";
                     // Color
                     const color = document.createElement("div");
                     color.classList.add("inspector-element");
                     color.innerHTML = "<h3>Color</h3>";
                     const colorInput = document.createElement("input");
                     colorInput.type = "color";
-                    colorInput.value = "#" + material.color.getHexString();
+                    colorInput.value = "#" + selectedObject.material[i].color.getHexString();
                     colorInput.addEventListener("input", function() {
-                        material.color.set(colorInput.value);
+                        selectedObject.material[i].color.set(colorInput.value);
                     });
                     color.appendChild(colorInput);
-                    materialInspector.appendChild(color);
-                    inspector.appendChild(materialInspector);
+                    inspector.appendChild(color);
+
+                    // Roughness
+                    const roughness = document.createElement("div");
+                    roughness.classList.add("inspector-element");
+                    roughness.innerHTML = "<h3>Roughness</h3>";
+                    const roughnessInput = document.createElement("input");
+                    roughnessInput.type = "number";
+                    roughnessInput.value = selectedObject.material[i].roughness;
+                    roughnessInput.addEventListener("input", function() {
+                        selectedObject.material[i].roughness = roughnessInput.value;
+                    });
+                    roughness.appendChild(roughnessInput);
+                    inspector.appendChild(roughness);
                 }
+                if (wasArray) selectedObject.material = selectedObject.material[0];
             }
         }
         const addToScene = function(item)
@@ -551,19 +554,6 @@
                     const helper = new THREE.PointLightHelper(light, 0.2);
                     scene.add(helper);
                     break;
-                case "Create Directional Light":
-                    const directionalLight = new THREE.DirectionalLight(randomColor(), 1);
-                    directionalLight.name = "Directional Light - " + Math.floor(Math.random() * 1000);
-                    directionalLight.position.set(0, 1, 0);
-                    directionalLight.castShadow = true;
-                    directionalLight.shadow.mapSize.width = 1024;
-                    directionalLight.shadow.mapSize.height = 1024;
-                    directionalLight.shadow.camera.near = 0.5;
-                    directionalLight.shadow.camera.far = 500;
-                    addToScene(directionalLight);
-                    const directionalLightHelper = new THREE.DirectionalLightHelper(directionalLight, 0.2);
-                    scene.add(directionalLightHelper);
-                    break;
                 case "Create Spot Light":
                     const spotLight = new THREE.SpotLight(randomColor(), 1, 100, Math.PI * 0.1, 0.25, 1);
                     spotLight.name = "Spot Light - " + Math.floor(Math.random() * 1000);
@@ -577,6 +567,14 @@
                     addToScene(spotLight);
                     const spotLightHelper = new THREE.SpotLightHelper(spotLight);
                     scene.add(spotLightHelper);
+                    // create a 'target' for the spotLightHelper, that follows the position of the spotlight's 'target', and add it to the userdata
+                    const helperTarget = new THREE.Mesh(
+                        new THREE.SphereGeometry(0.05, 16, 16),
+                        new THREE.MeshBasicMaterial({ color: 0xff0000 })
+                    );
+                    spotLight.add(helperTarget);
+                    helperTarget.position.y -= 2;
+                    spotLight.target = helperTarget;
                     break;
                 case "Delete Object":
                     removeFromScene(selectedObject);
@@ -670,6 +668,7 @@
                     "TransformControlsGizmo",
                     "TransformControlsPlane",
                     "GridHelper",
+                    "LineSegments",
                     "Line"
                 ]
                 // remove any intersects that are, have a parent that is, or have a parent whose parent is, any disallowedObjects type
@@ -688,10 +687,6 @@
                     }
                 }
                 if (!intersects[index]) return;
-                if (intersects[index].object.type.includes('PointLightHelper')) {
-                    console.log(intersects[index].object);
-                    intersects[index].object = intersects[index].object.light;
-                }
                 attachHandles(intersects[index].object);
                 // add "active" to the <li> in left-panel with the object's name, and remove it from all other objects
                 const list = document.querySelector("#scene-objects-list");
