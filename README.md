@@ -15,5 +15,5 @@ my javascript game engine
 - ~~Physically Based Renderer~~
 - Physics
 - Premade Controller Profiles
-- Multi-platform Builds
+- ~~Multi-platform Builds~~
 - ~~UI Theme Support~~
