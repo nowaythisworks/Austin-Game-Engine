@@ -1,6 +1,8 @@
 # Austin's Game Engine
 my javascript game engine
 
+(made for fun)
+
 ## game in editor --> game at runtime
 ![game in editor](https://user-images.githubusercontent.com/66288732/225178946-97f1406c-7383-4375-beda-a03f9f7278da.png)
 ![game at runtime](https://user-images.githubusercontent.com/66288732/225179016-1a146231-dc45-44d5-be34-b66091be92f8.png)
