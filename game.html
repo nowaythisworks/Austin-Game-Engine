@@ -30,6 +30,19 @@
     </div>
 
     <script type="module">
+        // ### ERROR REPORTING
+        const spitError = function(err) {
+            // remove the canvas if any
+            const canvas = document.querySelector("#editor-canvas");
+            if (canvas) canvas.remove();
+            document.body.innerHTML += "--<br><code>ERROR - " + err + "</code><br>"
+        }
+
+        // on error, spit out the error message
+        window.onerror = function (msg, url, lineNo, columnNo, error) {
+            spitError(msg + "<br>Line: " + lineNo + "<br>Column: " + columnNo + "<br>Error: " + error);
+        }
+
         // ### IMPORTANT METADATA
         const editorVersion = "0.1.0"
         document.title = "Austin's Game Engine " + editorVersion
@@ -51,29 +64,41 @@
         // we will ask the user for a file, and load it into the scene
         const clock = new THREE.Clock();
         const importProject = function () {
+            //  ### LOAD GAME DATA FROM ENGINE SAVE FILE ###
             console.log("Importing...")
-
-            // read the file in /saves/savedata.json
-            
             const fs = require('fs');
             const data = JSON.parse(fs.readFileSync('saves/savedata.json', 'utf8'));
-
-            // load the scene
             const loader = new THREE.ObjectLoader();
             const gameScene = loader.parse(data.scene);
             console.log(gameScene);
-
-            // let the scene render in the canvas
             const renderer = new THREE.WebGLRenderer({ canvas: canvas });
             let camera;
-            // find the first camera in the scene
-            gameScene.traverse(function (child) {
+            for (let i = 0; i < gameScene.children.length; i++) {
+                const child = gameScene.children[i];
+                if (child.userData.existInGame != true) {
+                    gameScene.remove(child);
+                    i--;
+                }
                 if (child.isCamera == true) {
                     camera = child;
                 }
-            });
+            };
+                
+            const updateRendererProjection = function() {
+                renderer.setSize(editorWindow.clientWidth, editorWindow.clientHeight);
+                renderer.setPixelRatio(window.devicePixelRatio);
+                if (!camera)
+                {
+                    spitError("No camera found in scene.<br>Please add a camera to the scene.");
+                    return;
+                }
+                camera.aspect = editorWindow.clientWidth / editorWindow.clientHeight;
+                camera.updateProjectionMatrix();
+            }
+            updateRendererProjection();
+            window.addEventListener('resize', updateRendererProjection);
 
-            // pointer lock controls
+            // ### POINTER LOCK CONTROLS ###
             const controls = new PointerLockControls(camera, canvas);
             controls.addEventListener('lock', function () {
                 console.log("Pointer Lock Controls Enabled");
@@ -82,7 +107,6 @@
                 console.log("Pointer Lock Controls Disabled");
             });
             gameScene.add(controls.getObject());
-
             // ### KEYBOARD INPUT ###
             const keyboard = {};
             document.addEventListener('keydown', function (event) {
@@ -91,18 +115,16 @@
             document.addEventListener('keyup', function (event) {
                 keyboard[event.code] = false;
             });
-
             // ### MOUSE INPUT ###
             let mouseDown = false;
             document.addEventListener('mousedown', function (event) {
                 mouseDown = true;
                 controls.lock();
             });
-
             // ### GAME LOOP ###
             const gameLoop = function () {
                 // ### PLAYER MOVEMENT ###
-                const playerMoveSpeed = 10;
+                const playerMoveSpeed = 5;
                 const delta = clock.getDelta();
                 let xAxis = keyboard["KeyD"] - keyboard["KeyA"];
                 let zAxis = keyboard["KeyW"] - keyboard["KeyS"];
@@ -121,7 +143,6 @@
                 // call the game loop again
                 requestAnimationFrame(gameLoop);
             }
-
             // start the game loop
             gameLoop();
         }
@@ -135,6 +156,11 @@
             overflow: hidden;
             font-family: 'Montserrat', sans-serif;
             user-select: none;
+        }
+
+        code {
+            color: red;
+            background: black;
         }
 
         #center-panel {

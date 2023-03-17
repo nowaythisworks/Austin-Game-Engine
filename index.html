@@ -94,6 +94,17 @@
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         import { TransformControls } from 'three/addons/controls/TransformControls.js';
 
+        // ### MOUSE POSITION
+        const globalMousePosition = {
+            clientX: 0,
+            clientY: 0
+        }
+
+        document.addEventListener('mousemove', function (event) {
+            globalMousePosition.clientX = event.clientX;
+            globalMousePosition.clientY = event.clientY;
+        });
+
         // ### CANVAS INITIALIZATION
         const editorWindow = document.querySelector("#center-panel");
         editorWindow.innerHTML = "";
@@ -118,22 +129,23 @@
         renderer.setPixelRatio(window.devicePixelRatio);
         const gridHelper = new THREE.GridHelper(25, 12);
         gridHelper.name = "GridHelper";
-        gridHelper.userData.showInHierarchy = false;
+        gridHelper.userData.existInGame = false;
         DEFAULTOBJECTS.push(gridHelper);
         scene.add(gridHelper);
         const controls = new OrbitControls(camera, canvas);
         controls.name = "OrbitControls";
         DEFAULTOBJECTS.push(controls);
-        window.addEventListener("resize", function () {
+        const adjustCanvasSize = function () {
             canvas.width = editorWindow.clientWidth;
             canvas.height = editorWindow.clientHeight;
             camera.aspect = canvas.width / canvas.height;
             camera.updateProjectionMatrix();
             renderer.setSize(canvas.width, canvas.height);
-            renderer.setPixelRatio(window.devicePixelRatio);
-        });
-
-
+        };
+        
+        // ### EVENT LISTENERS
+        window.addEventListener('resize', adjustCanvasSize);
+        
         // ### ANIMATION LOOP
         const animate = function () {
             requestAnimationFrame(animate);
@@ -147,7 +159,7 @@
         const randomColor = function () { return new THREE.Color(0xffffff * Math.random()); }
         const transformControls = new TransformControls(camera, canvas);
         transformControls.name = "TransformControls"
-        transformControls.userData.showInHierarchy = false;
+        transformControls.userData.existInGame = false;
         var selectedObject;
         var retachAvailable = true;
         transformControls.size = 1.25;
@@ -178,11 +190,15 @@
             }
         });
         const attachHandles = function (item) {
-            console.log(item);
             if (!retachAvailable) return;
             if (item.userData.selectParentInstead == true) item = item.parent;
-            transformControls.attach(item);
+            if (item.type.includes("LightHelper")) {
+                item = item.light;
+            }
             selectedObject = item;
+            console.log(item);
+
+            transformControls.attach(selectedObject);
 
             document.querySelector("#selection-name").innerHTML = item.name;
 
@@ -191,7 +207,6 @@
             inspector.innerHTML = "";
 
             if (selectedObject.isObject3D == true) {
-                console.log(selectedObject);
                 // Position (X, Y, Z) in a row
                 const position = document.createElement("div");
                 position.classList.add("inspector-element");
@@ -463,18 +478,25 @@
         const addDefaultCamera = function () {
             // adds a camerahelper as a placeholder for the camera
             let defaultCamera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            defaultCamera.userData.existInGame = true;
             defaultCamera.name = "Main Camera";
             defaultCamera.position.z = 5;
+            defaultCamera.userData.controllerProfile = "FirstPersonController";
+            defaultCamera.userData.controllerInfo = {
+                "MoveSpeed": 10,
+                "LookSpeed": 1
+            };
             addToScene(defaultCamera);
 
             cameraHelper = new THREE.CameraHelper(defaultCamera);
-            cameraHelper.userData.importOnLoad = false;
-            cameraHelper.userData.showInHierarchy = false;
+            cameraHelper.userData.existInGame = false;
             scene.add(cameraHelper);
-            DEFAULTOBJECTS.push(defaultCamera);
+            // dont put default camera in defaultobjects to prevent it from duplicating when importing projects
+            // DEFAULTOBJECTS.push(defaultCamera);
         }
         const addDefaultLight = function () {
             let defaultLight = new THREE.DirectionalLight(0xffffff, 1);
+            defaultLight.userData.existInGame = true;
             defaultLight.name = "Directional Light";
             addToScene(defaultLight);
             let directionalLightHelper = new THREE.DirectionalLightHelper(defaultLight, 0.2);
@@ -485,10 +507,8 @@
                 new THREE.MeshBasicMaterial({ color: 0xff0000 })
             );
             directionalLightHelperTarget.userData.selectParentInstead = true;
-            directionalLightHelperTarget.userData.importOnLoad = false;
-            directionalLightHelper.userData.importOnLoad = false;
-            directionalLightHelperTarget.userData.showInHierarchy = false;
-            directionalLightHelper.userData.showInHierarchy = false;
+            directionalLightHelperTarget.userData.existInGame = false;
+            directionalLightHelper.userData.existInGame = false;
             defaultLight.add(directionalLightHelperTarget);
             directionalLightHelperTarget.position.y -= 1;
             defaultLight.target = directionalLightHelperTarget;
@@ -508,8 +528,8 @@
             // remove the item
             scene.remove(item);
             document.querySelector("#object-counter").innerHTML = parseInt(document.querySelector("#object-counter").innerHTML) - 1;
-            if (document.querySelector("#object-counter").innerHTML == 1) document.querySelector("#object-counter-label").innerHTML = "object";
-            else document.querySelector("#object-counter-label").innerHTML = "total objects";
+            if (document.querySelector("#object-counter").innerHTML == 1) document.querySelector("#object-counter-label").innerHTML = " object";
+            else document.querySelector("#object-counter-label").innerHTML = " total objects";
 
             // remove the <li> from left-panel with the item's name
             const list = document.querySelector("#scene-objects-list");
@@ -521,10 +541,15 @@
             // detach handles
             transformControls.detach();
         }
+        var centerPanelIsFullScreen = false;
         document.body.addEventListener('keydown', function (event) {
             // if press 'del' and there is an object selected, remove it
             if (event.key == "Delete" && transformControls.object != undefined) {
                 removeFromScene(transformControls.object);
+            }
+            // if "escape" hide context menu
+            if (event.key == "Escape") {
+                document.querySelector("#right-click-menu").style.display = "none";
             }
             if (transformControls.object != undefined) {
                 switch (event.key) {
@@ -542,7 +567,7 @@
                         break;
                 }
             }
-            // if holding down control
+            // CTRL Commands
             if (event.ctrlKey) {
                 switch (event.key) {
                     case 'z':
@@ -587,6 +612,35 @@
                         break;
                 }
             }
+            // Shift Commands
+            if (event.shiftKey) {
+                switch (event.key) {
+                    case ' ':
+                        console.log(centerPanelIsFullScreen);
+                        // make the center panel fill the entire screen (EXCEPT the top bar paneL)
+                        if (centerPanelIsFullScreen == false) {
+                            // style the center panel to fill
+                            document.querySelector("#center-panel").style.gridRow = "1 / 5";
+                            document.querySelector("#center-panel").style.gridColumn = "1 / 5";
+                            document.querySelector("#center-panel").style.zIndex = "100";
+                            centerPanelIsFullScreen = true;
+                        }
+                        else {
+                            document.querySelector("#center-panel").style.gridRow = "2 / 3";
+                            document.querySelector("#center-panel").style.gridColumn = "2 / 3";
+                            document.querySelector("#center-panel").style.zIndex = "0";
+                            centerPanelIsFullScreen = false;
+                        }
+                        adjustCanvasSize();
+                        break;
+                    case 'A':
+                        // prevent default browser behavior
+                        event.preventDefault();
+                        // invoke context menu
+                        console.log(1);
+                        invokeContextMenu();
+                }
+            }
             // debug commands
             if (event.key == "s") {
                 console.log(scene);
@@ -600,25 +654,55 @@
             switch (action) {
                 //  ### Object Creation
                 case "Create Mesh":
-                    const mesh = new THREE.Mesh(
+                    const cube = new THREE.Mesh(
                         new THREE.BoxGeometry(1, 1, 1),
                         new THREE.MeshStandardMaterial({ color: randomColor() })
                     );
-                    mesh.name = "New Mesh - " + Math.floor(Math.random() * 1000);
-                    addToScene(mesh);
+                    cube.userData.existInGame = true;
+                    cube.name = "New Mesh - " + Math.floor(Math.random() * 1000);
+                    addToScene(cube);
+                    // add event listener to change in .userData.meshType
+                    cube.userData.meshType = "Box";
+                    cube.userData.addEventListener("change", function () {
+                        switch (this.meshType) {
+                            default:
+                                console.log("Illegal Mesh Type: " + this.meshType);
+                                cube.geometry = new THREE.BoxGeometry(1, 1, 1);
+                                break;
+                            case "Box":
+                                cube.geometry = new THREE.BoxGeometry(1, 1, 1);
+                                break;
+                            case "Sphere":
+                                cube.geometry = new THREE.SphereGeometry(1, 32, 32);
+                                break;
+                            case "Cylinder":
+                                cube.geometry = new THREE.CylinderGeometry(1, 1, 1, 32);
+                                break;
+                            case "Plane":
+                                cube.geometry = new THREE.PlaneGeometry(1, 1, 32, 32);
+                                break;
+                            case "Cone":
+                                cube.geometry = new THREE.ConeGeometry(1, 1, 32);
+                                break;
+                            case "Torus":
+                                cube.geometry = new THREE.TorusGeometry(1, 0.4, 32, 32);
+                                break;
+                        }
+                    });
                     break;
                 case "Create Point Light":
                     const light = new THREE.PointLight(new THREE.Color(0xffffff), 1, 100);
+                    light.userData.existInGame = true;
                     light.name = "Point Light - " + Math.floor(Math.random() * 1000);
                     light.position.y = 1.5;
                     addToScene(light);
                     const helper = new THREE.PointLightHelper(light, 0.2);
-                    helper.userData.importOnLoad = false;
-                    helper.userData.showInHierarchy = false;
+                    helper.userData.existInGame = false;
                     scene.add(helper);
                     break;
                 case "Create Spot Light":
                     const spotLight = new THREE.SpotLight(randomColor(), 1, 100, Math.PI * 0.1, 0.25, 1);
+                    spotLight.userData.existInGame = true;
                     spotLight.name = "Spot Light - " + Math.floor(Math.random() * 1000);
                     spotLight.position.set(0, 2, 0);
                     spotLight.castShadow = true;
@@ -636,14 +720,14 @@
                         new THREE.MeshBasicMaterial({ color: 0xff0000 })
                     );
                     spotLightHelperTarget.userData.selectParentInstead = true;
-                    spotLightHelperTarget.userData.importOnLoad = false;
-                    spotLightHelperTarget.userData.showInHierarchy = false;
+                    spotLightHelperTarget.userData.existInGame = false;
                     spotLight.add(spotLightHelperTarget);
                     spotLightHelperTarget.position.y -= 2;
                     spotLight.target = spotLightHelperTarget;
                     break;
                 case "Create Directional Light":
                     const directionalLight = new THREE.DirectionalLight(randomColor(), 1);
+                    directionalLight.userData.existInGame = true;
                     directionalLight.name = "Directional Light - " + Math.floor(Math.random() * 1000);
                     directionalLight.position.set(0, 2, 0);
                     directionalLight.castShadow = true;
@@ -656,25 +740,25 @@
                         new THREE.MeshBasicMaterial({ color: 0xff0000 })
                     );
                     directionalLightHelperTarget.userData.selectParentInstead = true;
-                    directionalLightHelperTarget.userData.importOnLoad = false;
-                    directionalLightHelper.userData.importOnLoad = false;
-                    directionalLightHelperTarget.userData.showInHierarchy = false;
-                    directionalLightHelper.userData.importOnLshowInHierarchyoad = false;
+                    directionalLightHelper.userData.existInGame = false;
+                    directionalLightHelperTarget.userData.existInGame = false;
                     directionalLight.add(directionalLightHelperTarget);
                     directionalLightHelperTarget.position.y -= 2;
                     directionalLight.target = directionalLightHelperTarget;
                     break;
                 case "Create Hemisphere Light":
                     const hemisphereLight = new THREE.HemisphereLight(0xffffbb, 0x080820, 1);
+                    hemisphereLight.userData.existInGame = true;
                     hemisphereLight.name = "Hemisphere Light - " + Math.floor(Math.random() * 1000);
                     addToScene(hemisphereLight);
                     // helper
                     const hemisphereLightHelper = new THREE.HemisphereLightHelper(hemisphereLight, 0.2);
-                    hemisphereLightHelper.userData.importOnLoad = false;
+                    hemisphereLightHelper.userData.existInGame = false;
                     scene.add(hemisphereLightHelper);
                     break;
                 case "Create Ambient Light":
                     const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+                    ambientLight.userData.existInGame = true;
                     ambientLight.name = "Ambient Light - " + Math.floor(Math.random() * 1000);
                     addToScene(ambientLight);
                     break;
@@ -692,12 +776,10 @@
                     break;
             }
         }
-        document.body.addEventListener("contextmenu", function (e) {
-            e.preventDefault();
-            const clickedElement = document.elementFromPoint(e.clientX, e.clientY);
-            if (clickedElement.id == "editor-canvas") return;
+        const invokeContextMenu = function(e) {
+            const clickedElement = document.elementFromPoint(globalMousePosition.clientX, globalMousePosition.clientY);
             const options = [];
-            if (clickedElement.id == "left-panel") {
+            if (clickedElement.id == "left-panel" || clickedElement.id == "editor-canvas") {
                 options.push("[] Add Geometry");
                 options.push("Create Mesh");
                 options.push("[] Add Lighting");
@@ -738,8 +820,16 @@
             }
             rightClickMenu.style.display = "block";
             rightClickMenu.style.animation = "fade-in 0.1s ease-in-out";
-            rightClickMenu.style.left = e.clientX + "px";
-            rightClickMenu.style.top = e.clientY + "px";
+            rightClickMenu.style.left = globalMousePosition.clientX + "px";
+            rightClickMenu.style.top = globalMousePosition.clientY + "px";
+        }
+        document.body.addEventListener("contextmenu", function (e) {
+            e.preventDefault();
+            // if it's on #editor-canvas, return
+            if (e.target.id == "editor-canvas") {
+                return;
+            }
+            invokeContextMenu(e);
         });
         // on click out
         document.body.addEventListener("click", function (e) {
@@ -747,16 +837,20 @@
         });
 
         // Editor Click Events
+        canvas.addEventListener("mouseup", function (e) {
+            if (e.button == 0) {
+                transformControls.detach();
+            }
+        });
         canvas.addEventListener("click", function (e) {
-
             // shoot ray until first target is hit, attach transformControls to it
             const raycaster = new THREE.Raycaster();
 
             var mouse = new THREE.Vector2();
 
             const rect = renderer.domElement.getBoundingClientRect();
-            const x = event.clientX - rect.left;
-            const y = event.clientY - rect.top;
+            const x = globalMousePosition.clientX - rect.left;
+            const y = globalMousePosition.clientY - rect.top;
 
             mouse.x = (x / canvas.clientWidth) * 2 - 1;
             mouse.y = (y / canvas.clientHeight) * - 2 + 1
@@ -814,6 +908,11 @@
 
         const saveProject = function () {
             console.log("Saving...")
+            // for every object in DEFAULTOBJECTS, set userData defaultObject to true
+            console.log(DEFAULTOBJECTS);
+            for (let i = 0; i < DEFAULTOBJECTS.length; i++) {
+                DEFAULTOBJECTS[i].defaultObject = true;
+            }
 
             const gameSceneSave = scene.toJSON();
             const saveData = {
@@ -839,9 +938,6 @@
             const list = document.querySelector("#scene-objects-list");
             list.innerHTML = "";
             for (let i = 0; i < scene.children.length; i++) {
-                // if the userdata has importOnLoad as false, skip
-                if (scene.children[i].userData.showInHierarchy == false) continue;
-
                 const item = document.createElement("li");
                 item.innerHTML = scene.children[i].name;
                 list.appendChild(item);
@@ -888,13 +984,6 @@
                     // load the scene
                     const loader = new THREE.ObjectLoader();
                     const gameScene = loader.parse(saveData.scene);
-                    // for each child of gamescene (including all children of children), if it has userdata "importOnLoad" false, remove it
-                    for (let i = 0; i < gameScene.children.length; i++) {
-                        if (gameScene.children[i].userData.importOnLoad == false) {
-                            gameScene.remove(gameScene.children[i]);
-                            i--;
-                        }
-                    }
 
                     // remove every child of scene that is not in DEFAULTOBJECTS
                     for (let i = 0; i < scene.children.length; i++) {
@@ -907,6 +996,7 @@
 
                     // add the children of gamescene to scene
                     for (let i = 0; i < gameScene.children.length; i++) {
+                        if (gameScene.children[i].userData.existInGame == false) continue;
                         scene.add(gameScene.children[i]);
                     }
                     
@@ -1000,7 +1090,6 @@
             grid-column: 1 / 2;
             grid-row: 2 / 4;
             background-color: var(--side-panel-bg-color);
-            border-radius: 0px 50px 0px 0px;
         }
 
         #left-panel ul {
@@ -1010,7 +1099,6 @@
 
         #left-panel li {
             padding: 10px;
-            border-radius: 5px;
             font-size: 80%;
         }
 
@@ -1036,7 +1124,6 @@
             grid-column: 3 / 4;
             grid-row: 4 / 2;
             background-color: var(--side-panel-bg-color);
-            border-radius: 15px 0px 0px 0px;
         }
 
         /* Style the bottom panel */
@@ -1058,7 +1145,6 @@
 
             margin: 0;
             padding: 0;
-            border-radius: 25px 25px 0px 0px;
 
             /* absolute center all elements inside this */
             display: flex;
