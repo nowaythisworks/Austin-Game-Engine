@@ -1,6 +1,10 @@
 // Modules to control application life and create native browser window
 const { app, BrowserWindow } = require('electron')
-require('electron-reload')(__dirname);
+
+const ignore_modules = /node_modules|[/\\]\./;
+const ignore_saves = /saves|[/\\]\./;
+require('electron-reload')(__dirname, {ignored: [ignore_modules, ignore_saves]});   
+
 const path = require('path')
 
 function createWindow() {

@@ -122,9 +122,9 @@
                 controls.lock();
             });
             // ### GAME LOOP ###
+            var playerMoveSpeed = 1;
             const gameLoop = function () {
                 // ### PLAYER MOVEMENT ###
-                const playerMoveSpeed = 5;
                 const delta = clock.getDelta();
                 let xAxis = keyboard["KeyD"] - keyboard["KeyA"];
                 let zAxis = keyboard["KeyW"] - keyboard["KeyS"];
@@ -136,9 +136,14 @@
                 controls.moveForward(zAxis * playerMoveSpeed * delta);
                 controls.moveRight(xAxis * playerMoveSpeed * delta);
 
+                playerMoveSpeed = parseInt(camera.userData.controllerInfo.MoveSpeed);
 
                 // render the scene
                 renderer.render(gameScene, camera);
+
+                // update all scene objects' matrix world (including children of children)
+                const numOfObjects = 0;
+                var parent = gameScene;
 
                 // call the game loop again
                 requestAnimationFrame(gameLoop);

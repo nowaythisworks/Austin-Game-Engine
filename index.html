@@ -118,6 +118,7 @@
         // ### THREE.JS RENDERER INITIALIZATION
         const DEFAULTOBJECTS = [];
         var scene = new THREE.Scene();
+        scene.name = "New Scene"
         const camera = new THREE.PerspectiveCamera(40, canvas.width / canvas.height, 0.1, 1000);
         camera.position.x = -27.65656251980899;
         camera.position.y = 22.536512419213917;
@@ -125,7 +126,9 @@
         camera.rotation.x = -0.7733129332359928;
         camera.rotation.y = -0.6160013614421702;
         camera.rotation.z = -0.5135108191734854;
+        DEFAULTOBJECTS.push(camera);
         const renderer = new THREE.WebGLRenderer({ canvas: canvas });
+        renderer.setClearColor(0x1e2021, 1);
         renderer.setPixelRatio(window.devicePixelRatio);
         const gridHelper = new THREE.GridHelper(25, 12);
         gridHelper.name = "GridHelper";
@@ -427,6 +430,245 @@
                     }
                 }
             }
+            // Camera (only one in scene)
+            if (selectedObject.isCamera == true) {
+                // FOV
+                const fov = document.createElement("div");
+                fov.classList.add("inspector-element");
+                fov.innerHTML = "<h3>FOV</h3>";
+                const fovInput = document.createElement("input");
+                fovInput.type = "number";
+                fovInput.value = selectedObject.fov;
+                fovInput.addEventListener("input", function () {
+                    selectedObject.fov = fovInput.value;
+                });
+                fov.appendChild(fovInput);
+                inspector.appendChild(fov);
+
+                // Near
+                const near = document.createElement("div");
+                near.classList.add("inspector-element");
+                near.innerHTML = "<h3>Near</h3>";
+                const nearInput = document.createElement("input");
+                nearInput.type = "number";
+                nearInput.value = selectedObject.near;
+                nearInput.addEventListener("input", function () {
+                    selectedObject.near = nearInput.value;
+                });
+                near.appendChild(nearInput);
+                inspector.appendChild(near);
+
+                // Far
+                const far = document.createElement("div");
+                far.classList.add("inspector-element");
+                far.innerHTML = "<h3>Far</h3>";
+                const farInput = document.createElement("input");
+                farInput.type = "number";
+                farInput.value = selectedObject.far;
+                farInput.addEventListener("input", function () {
+                    selectedObject.far = farInput.value;
+                });
+                far.appendChild(farInput);
+                inspector.appendChild(far);
+
+                // [USERDATA] Controller Type - selection with options FirstPersonController, Static Object
+                const controllerType = document.createElement("div");
+                controllerType.classList.add("inspector-element");
+                controllerType.innerHTML = "<h3>Controller Type</h3>";
+                const controllerTypeInput = document.createElement("select");
+                const controllerTypes = ["FirstPersonController", "Static Object"];
+                for (let i = 0; i < controllerTypes.length; i++) {
+                    const option = document.createElement("option");
+                    option.value = controllerTypes[i];
+                    option.innerHTML = controllerTypes[i];
+                    if (selectedObject.userData.controllerType == controllerTypes[i]) {
+                        option.selected = true;
+                    }
+                    controllerTypeInput.appendChild(option);
+                }
+                if (selectedObject.userData.controllerType == undefined) {
+                    selectedObject.userData.controllerType = "FirstPersonController";
+                }
+                controllerTypeInput.addEventListener("input", function () {
+                    selectedObject.userData.controllerType = controllerTypeInput.value;
+                });
+                controllerType.appendChild(controllerTypeInput);
+                inspector.appendChild(controllerType);
+
+                // [USERDATA] Movement Speed
+                // Set the default to 10
+                if (selectedObject.userData.movementSpeed == undefined) {
+                    selectedObject.userData.movementSpeed = 1;
+                }
+                const movementSpeed = document.createElement("div");
+                movementSpeed.classList.add("inspector-element");
+                movementSpeed.innerHTML = "<h3>Movement Speed</h3>";
+                const movementSpeedInput = document.createElement("input");
+                movementSpeedInput.type = "number";
+                movementSpeedInput.value = selectedObject.userData.movementSpeed;
+                movementSpeedInput.addEventListener("input", function () {
+                    selectedObject.userData.movementSpeed = movementSpeedInput.value;
+                });
+                movementSpeed.appendChild(movementSpeedInput);
+                inspector.appendChild(movementSpeed);
+            }
+        }
+        // ### UPDATING HIERARCHY PANEL ###
+        const updateLeftPanel = function () {
+            const list = document.querySelector("#scene-objects-list");
+            list.innerHTML = "";
+            const sceneObjects = [];
+            // recursively add EVERY CHILD OF CHILD to the list
+            const addChildren = function (object) {
+                for (let i = 0; i < object.children.length; i++) {
+                    sceneObjects.push(object.children[i]);
+                    addChildren(object.children[i]);
+                }
+            }
+            addChildren(scene);
+            for (let i = 0; i < sceneObjects.length; i++) {
+                sceneObjects[i].updateMatrixWorld();
+                if (!sceneObjects[i].userData.existInGame) continue;
+                if (sceneObjects[i].userData.existInGame != false)
+                {
+                    var numOfParents = 0;
+                    var parent = sceneObjects[i].parent;
+                    while (parent != scene) {
+                        numOfParents++;
+                        parent = parent.parent;
+                    }
+
+                    const item = document.createElement("li");
+                    item.innerHTML = sceneObjects[i].name;
+                    item.style.paddingLeft = numOfParents * 20 + "px";
+                    
+                    list.appendChild(item);
+
+                    item.addEventListener("click", function () {
+                        // add transform controls to the item
+                        var sceneObject;
+                        for (let i = 0; i <sceneObjects.length; i++) {
+                            if (sceneObjects[i].name == item.innerHTML) {
+                                sceneObject = sceneObjects[i];
+                                break;
+                            }
+                        }
+                        attachHandles(sceneObject);
+                        // add the "active" class to the <li>
+                        item.classList.add("active");
+                        // remove the "active" class from all other LIs
+                        for (let i = 0; i < list.children.length; i++) {
+                            if (list.children[i] !== item) {
+                                list.children[i].classList.remove("active");
+                            }
+                        }
+                    });
+
+                    // double click
+                    item.addEventListener("dblclick", function () {
+                        // replace the innerHTML with an <input> element
+                        const input = document.createElement("input");
+                        input.value = item.name;
+                        item.innerHTML = "";
+                        item.appendChild(input);
+                        input.focus();
+                        input.id = "text-input"
+                        const cleanup = function () {
+                            item.name = input.value;
+                            item.innerHTML = item.name;
+                            input.remove();
+                        }
+                        input.addEventListener("blur", cleanup);
+                        input.addEventListener("keydown", function (event) {
+                            if (event.key === "Enter") cleanup();
+                        });
+                        input.addEventListener("click", function (event) {
+                            event.stopPropagation();
+                        });
+                    });
+                }
+            }
+
+            // make every element in list draggable
+            const snapBorderStyle = "1px solid white";
+            const defaultStyle = "padding: 10px; font-size: 80%; border-radius: 5px;"
+            for (let i = 0; i < list.children.length; i++) {
+                list.children[i].draggable = true;
+                list.children[i].addEventListener("dragstart", function (e) {
+                    e.dataTransfer.setData("text/plain", e.target.innerHTML);
+                });
+                list.children[i].addEventListener("dragover", function (e) {
+                    e.preventDefault();
+
+                    // if the drag is on the top quarter or bottom quarter of the element
+                    if (e.offsetY < e.target.offsetHeight / 4 || e.offsetY > e.target.offsetHeight * 3 / 4) {
+                        // set the element's top border to white
+                        e.target.style.borderTop = snapBorderStyle;
+                    }
+                    else
+                    {
+                        e.target.style.opacity = 0.25;
+                    }
+                });
+                list.children[i].addEventListener("dragleave", function (e) {
+                    e.preventDefault();
+                    // set the element's bottom border to black
+                    e.target.style.borderTop = "none"
+                    e.target.style = defaultStyle;
+                });
+                list.children[i].addEventListener("drop", function (e) {
+                    e.preventDefault();
+                    const data = e.dataTransfer.getData("text/plain");
+                    const target = e.target.innerHTML;
+                    // if the style includes parentStyle, make the target the parent of the data
+                    if (e.target.style.opacity == 0.25) {
+                        console.log("parent");
+                        for (let i = 0; i < scene.children.length; i++) {
+                            // set as parent
+                            if (scene.children[i].name == data) {
+                                const objectToParent = scene.getObjectByName(data);
+                                const objectToParentTo = scene.getObjectByName(target);
+
+                                // if it has a parent, remove it
+                                if (objectToParent.parent != undefined) {
+                                    objectToParent.parent.remove(objectToParent);
+                                }
+                                objectToParentTo.add(objectToParent);
+
+                                console.log(objectToParent);
+                                console.log(objectToParentTo);
+                                console.log("Parenting " + objectToParent.name + " to " + objectToParentTo.name);
+                            }
+                        }
+                    }
+                    // if the border is white, swap the two elements
+                    else if (e.target.style.borderTop == snapBorderStyle) {
+                        console.log("swap");
+                        // swap the two elements
+                        for (let i = 0; i < scene.children.length; i++) {
+                            if (scene.children[i].name == data) {
+                                scene.children[i].name = target;
+                            }
+                            else if (scene.children[i].name == target) {
+                                scene.children[i].name = data;
+                            }
+                        }
+                        updateLeftPanel();
+                    }
+
+                    updateLeftPanel();
+                });
+            }
+
+            // for each element in the scene ,if it is a lighthelper and has no valid 'light' object assigned, remove it completely and run updateLeftPanel again
+            for (let i = 0; i < scene.children.length; i++) {
+                if (scene.children[i].isLightHelper) {
+                    if (scene.children[i].light == undefined) {
+                        scene.remove(scene.children[i]);
+                        updateLeftPanel();
+                    }
+                }
+            }
         }
         const addToScene = function (item) {
             scene.add(item);
@@ -435,44 +677,8 @@
             else document.querySelector("#object-counter-label").innerHTML = " total objects";
 
             const list = document.querySelector("#scene-objects-list");
-
-            const li = document.createElement("li");
-            li.innerHTML = item.name;
-            li.addEventListener("click", function () {
-                // add transform controls to the item
-                attachHandles(item);
-                // add the "active" class to the <li>
-                li.classList.add("active");
-                // remove the "active" class from all other LIs
-                for (let i = 0; i < list.children.length; i++) {
-                    if (list.children[i] !== li) {
-                        list.children[i].classList.remove("active");
-                    }
-                }
-            });
-            // doube click
-            li.addEventListener("dblclick", function () {
-                // replace the innerHTML with an <input> element
-                const input = document.createElement("input");
-                input.value = item.name;
-                li.innerHTML = "";
-                li.appendChild(input);
-                input.focus();
-                input.id = "text-input"
-                const cleanup = function () {
-                    item.name = input.value;
-                    li.innerHTML = item.name;
-                    input.remove();
-                }
-                input.addEventListener("blur", cleanup);
-                input.addEventListener("keydown", function (event) {
-                    if (event.key === "Enter") cleanup();
-                });
-                input.addEventListener("click", function (event) {
-                    event.stopPropagation();
-                });
-            });
-            list.appendChild(li);
+            
+            updateLeftPanel();
         }
         let cameraHelper;
         const addDefaultCamera = function () {
@@ -481,6 +687,7 @@
             defaultCamera.userData.existInGame = true;
             defaultCamera.name = "Main Camera";
             defaultCamera.position.z = 5;
+            defaultCamera.position.y = 1;
             defaultCamera.userData.controllerProfile = "FirstPersonController";
             defaultCamera.userData.controllerInfo = {
                 "MoveSpeed": 10,
@@ -489,30 +696,23 @@
             addToScene(defaultCamera);
 
             cameraHelper = new THREE.CameraHelper(defaultCamera);
+            cameraHelper.name = "Camera Helper";
             cameraHelper.userData.existInGame = false;
             scene.add(cameraHelper);
-            // dont put default camera in defaultobjects to prevent it from duplicating when importing projects
-            // DEFAULTOBJECTS.push(defaultCamera);
+            DEFAULTOBJECTS.push(defaultCamera);
+            DEFAULTOBJECTS.push(cameraHelper);
         }
         const addDefaultLight = function () {
-            let defaultLight = new THREE.DirectionalLight(0xffffff, 1);
+            let defaultLight = new THREE.HemisphereLight(0xffffff, 0x000000, 1);
             defaultLight.userData.existInGame = true;
-            defaultLight.name = "Directional Light";
+            defaultLight.name = "Hemisphere Light";
             addToScene(defaultLight);
-            let directionalLightHelper = new THREE.DirectionalLightHelper(defaultLight, 0.2);
-            scene.add(directionalLightHelper);
-
-            let directionalLightHelperTarget = new THREE.Mesh(
-                new THREE.SphereGeometry(0.05, 16, 16),
-                new THREE.MeshBasicMaterial({ color: 0xff0000 })
-            );
-            directionalLightHelperTarget.userData.selectParentInstead = true;
-            directionalLightHelperTarget.userData.existInGame = false;
-            directionalLightHelper.userData.existInGame = false;
-            defaultLight.add(directionalLightHelperTarget);
-            directionalLightHelperTarget.position.y -= 1;
-            defaultLight.target = directionalLightHelperTarget;
-            DEFAULTOBJECTS.push(defaultLight);
+            let hemisphereLightHelper = new THREE.HemisphereLightHelper(defaultLight, 1);
+            hemisphereLightHelper.name = "Hemisphere Light Helper";
+            hemisphereLightHelper.userData.existInGame = false;
+            scene.add(hemisphereLightHelper);
+            // DEFAULTOBJECTS.push(defaultLight);
+            // DEFAULTOBJECTS.push(hemisphereLightHelper);
         }
         addDefaultLight();
         addDefaultCamera();
@@ -531,13 +731,7 @@
             if (document.querySelector("#object-counter").innerHTML == 1) document.querySelector("#object-counter-label").innerHTML = " object";
             else document.querySelector("#object-counter-label").innerHTML = " total objects";
 
-            // remove the <li> from left-panel with the item's name
-            const list = document.querySelector("#scene-objects-list");
-            for (let i = 0; i < list.children.length; i++) {
-                if (list.children[i].innerHTML === item.name) {
-                    list.children[i].remove();
-                }
-            }
+            updateLeftPanel();
             // detach handles
             transformControls.detach();
         }
@@ -610,6 +804,11 @@
                         // prevent default browser behavior
                         event.preventDefault();
                         break;
+                    case 's':
+                        // prevent default browser behavior
+                        event.preventDefault();
+                        saveProject();
+                        break;
                 }
             }
             // Shift Commands
@@ -639,6 +838,9 @@
                         // invoke context menu
                         console.log(1);
                         invokeContextMenu();
+                    case 'S':
+                        const JSONScene = scene.toJSON();
+                        scene = new THREE.ObjectLoader().parse(JSONScene);
                 }
             }
             // debug commands
@@ -663,32 +865,6 @@
                     addToScene(cube);
                     // add event listener to change in .userData.meshType
                     cube.userData.meshType = "Box";
-                    cube.userData.addEventListener("change", function () {
-                        switch (this.meshType) {
-                            default:
-                                console.log("Illegal Mesh Type: " + this.meshType);
-                                cube.geometry = new THREE.BoxGeometry(1, 1, 1);
-                                break;
-                            case "Box":
-                                cube.geometry = new THREE.BoxGeometry(1, 1, 1);
-                                break;
-                            case "Sphere":
-                                cube.geometry = new THREE.SphereGeometry(1, 32, 32);
-                                break;
-                            case "Cylinder":
-                                cube.geometry = new THREE.CylinderGeometry(1, 1, 1, 32);
-                                break;
-                            case "Plane":
-                                cube.geometry = new THREE.PlaneGeometry(1, 1, 32, 32);
-                                break;
-                            case "Cone":
-                                cube.geometry = new THREE.ConeGeometry(1, 1, 32);
-                                break;
-                            case "Torus":
-                                cube.geometry = new THREE.TorusGeometry(1, 0.4, 32, 32);
-                                break;
-                        }
-                    });
                     break;
                 case "Create Point Light":
                     const light = new THREE.PointLight(new THREE.Color(0xffffff), 1, 100);
@@ -908,62 +1084,31 @@
 
         const saveProject = function () {
             console.log("Saving...")
-            // for every object in DEFAULTOBJECTS, set userData defaultObject to true
-            console.log(DEFAULTOBJECTS);
-            for (let i = 0; i < DEFAULTOBJECTS.length; i++) {
-                DEFAULTOBJECTS[i].defaultObject = true;
-            }
 
-            const gameSceneSave = scene.toJSON();
-            const saveData = {
-                meta: {
-                    // Editor Infos
-                    version: editorVersion,
-                    time: new Date().getTime()
-                },
-                scene: gameSceneSave
+            // for each object in DEFAULTOBJECTS, if the name doesnt start with "DEFAULT_", set it to that
+            for (let i = 0; i < DEFAULTOBJECTS.length; i++) {
+                if (!DEFAULTOBJECTS[i].name.startsWith("DEFAULT_")) {
+                    DEFAULTOBJECTS[i].name = "DEFAULT_" + DEFAULTOBJECTS[i].name;
+                }
             }
+            
+            // scene.tojson
+            var saveData = {
+                meta: {
+                    version: 1
+                },
+                scene: scene.toJSON()
+            }
+            console.log(saveData);
 
             // save to file
             var ipc = require('electron').ipcRenderer;
             ipc.send('save-file', JSON.stringify(saveData, null, 4));
-
         }
+
         document.querySelector("#save-button").addEventListener("click", function () {
             saveProject();
         });
-
-        // ### UPDATING HIERARCHY PANEL ###
-        const updateLeftPanel = function () {
-            const list = document.querySelector("#scene-objects-list");
-            list.innerHTML = "";
-            for (let i = 0; i < scene.children.length; i++) {
-                const item = document.createElement("li");
-                item.innerHTML = scene.children[i].name;
-                list.appendChild(item);
-
-                
-                item.addEventListener("click", function () {
-                    // add transform controls to the item
-                    var sceneObject;
-                    for (let i = 0; i < scene.children.length; i++) {
-                        if (scene.children[i].name == item.innerHTML) {
-                            sceneObject = scene.children[i];
-                            break;
-                        }
-                    }
-                    attachHandles(sceneObject);
-                    // add the "active" class to the <li>
-                        item.classList.add("active");
-                    // remove the "active" class from all other LIs
-                    for (let i = 0; i < list.children.length; i++) {
-                        if (list.children[i] !== item) {
-                            list.children[i].classList.remove("active");
-                        }
-                    }
-                });
-            }
-        }
 
         // ### OPENING ###
         // we will ask the user for a file, and load it into the scene
@@ -981,25 +1126,40 @@
                 reader.onload = readerEvent => {
                     var content = readerEvent.target.result;
                     const saveData = JSON.parse(content);
+                    // console.log the number of elements in scene.object.children\
+                    console.log(saveData.scene.object.children.length + " - RAWJson");
                     // load the scene
                     const loader = new THREE.ObjectLoader();
                     const gameScene = loader.parse(saveData.scene);
+                    console.log(gameScene.children.length + " - ParsedJson");
 
-                    // remove every child of scene that is not in DEFAULTOBJECTS
+                    // remove every child of scene
                     for (let i = 0; i < scene.children.length; i++) {
-                        // if the child is not in the DEFAULTOBJECTS array, remove it
+                        // if it isnt in DEFAULTOBJECTS[]
                         if (!DEFAULTOBJECTS.includes(scene.children[i])) {
                             scene.remove(scene.children[i]);
-                            i--;
                         }
                     }
 
-                    // add the children of gamescene to scene
+                    const objectsToAdd = [];
                     for (let i = 0; i < gameScene.children.length; i++) {
-                        if (gameScene.children[i].userData.existInGame == false) continue;
-                        scene.add(gameScene.children[i]);
+                        if (!DEFAULTOBJECTS.includes(gameScene.children[i]) && 
+                            !gameScene.children[i].name.startsWith("DEFAULT_") &&
+                            !gameScene.children[i].name.endsWith("Helper")) {
+                            objectsToAdd.push(gameScene.children[i]);
+                        }
                     }
-                    
+
+                    for (let i = 0; i < objectsToAdd.length; i++) {
+                        addToScene(objectsToAdd[i]);
+                        // if it's a light, add a helper for it (at its position and rotation)
+                        if (objectsToAdd[i].type == "DirectionalLight" || objectsToAdd[i].type == "PointLight") {
+                            const helper = new THREE.PointLightHelper(objectsToAdd[i], 1);
+                            helper.name = objectsToAdd[i].name + "Helper";
+                            addToScene(helper);
+                        }
+                    }
+
                     updateLeftPanel();
                 }
             }
@@ -1134,7 +1294,7 @@
             resize: vertical;
             transform: rotate(180deg);
             max-height: 500px;
-            min-height: 100px;
+            min-height: 200px;
         }
 
         /* Style the center panel  */
@@ -1182,13 +1342,28 @@
 
         input,
         select {
-            border-radius: 2px;
+            border-radius: 5px;
+            padding: 10px;
+            margin: 5px;
             border: none;
-            background: #242424;
+            background: #303030;
             border-radius: 2px;
             outline: 2px solid #2e2e2e;
             color: var(--font-color);
             padding-top: 5px;
+        }
+
+        /* number inputs */
+        /* dont show arrows */
+        input[type=number] {
+            max-width: 25%;
+            -moz-appearance: textfield;
+        }
+
+        input::-webkit-outer-spin-button,
+        input::-webkit-inner-spin-button {
+          -webkit-appearance: none !important;
+          margin: 0 !important;
         }
     </style>
 </body>
