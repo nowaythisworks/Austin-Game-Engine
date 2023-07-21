@@ -17,7 +17,7 @@ my javascript game engine
 ### Features & To-Do
 - ~~Physically Based Renderer~~
 - Physics
-- Premade Controller Profiles
+- ~~Premade Controller Profiles~~
 - ~~Multi-platform Builds~~
 - ~~UI Theme Support~~
 
